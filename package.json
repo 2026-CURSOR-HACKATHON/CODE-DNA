@@ -51,7 +51,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "test:ai": "npm run compile && node test-ai-api.js"
   },
   "devDependencies": {
     "@types/node": "^20.x",
