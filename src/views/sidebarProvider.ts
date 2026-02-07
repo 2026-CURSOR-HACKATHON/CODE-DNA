@@ -599,12 +599,15 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
     /* Git Graph Unified Style */
     .git-graph-unified {
       padding: 10px 8px;
+      position: relative;
     }
     .git-timeline-row {
       transition: background 0.15s;
+      position: relative;
     }
     .git-timeline-row:hover {
       background: var(--vscode-list-hoverBackground);
+      z-index: 10;
     }
     .git-timeline-row:hover .git-node-dot {
       transform: scale(1.3);
@@ -616,15 +619,19 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
     }
     .git-timeline-hover {
       animation: fadeIn 0.15s ease-out;
+      white-space: normal;
+    }
+    .graph-container {
+      overflow: visible !important;
     }
     @keyframes fadeIn {
       from {
         opacity: 0;
-        transform: translateY(-5px);
+        transform: translateX(-5px);
       }
       to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateX(0);
       }
     }
     .context-header {
@@ -917,136 +924,207 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       50% { opacity: 0.5; }
     }
     
-    /* Full Context View Styles */
-    .fullcontext-header {
+    /* Full Context View Styles - Modern Boxy Design */
+    #fullcontext-content {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--vscode-panel-border);
+      flex-direction: column;
+      gap: 16px;
+    }
+    .fullcontext-header {
+      background: var(--vscode-sideBar-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      padding: 16px 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .fullcontext-header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #4FC3F7 0%, #66BB6A 50%, #AB47BC 100%);
+      border-radius: 6px 6px 0 0;
     }
     .header-left {
       display: flex;
       align-items: center;
       gap: 12px;
+      margin-bottom: 12px;
     }
     .header-left h1 {
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
       margin: 0;
+      color: var(--vscode-foreground);
     }
     .id-badge {
-      font-family: monospace;
+      font-family: 'SF Mono', Monaco, monospace;
       font-size: 11px;
-      padding: 4px 8px;
+      padding: 5px 10px;
       background: var(--vscode-badge-background);
       color: var(--vscode-badge-foreground);
-      border-radius: 3px;
+      border-radius: 4px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
     }
     .header-meta {
+      display: flex;
+      gap: 16px;
       font-size: 12px;
       color: var(--vscode-descriptionForeground);
+      padding: 8px 0 0 0;
+      border-top: 1px solid var(--vscode-panel-border);
+    }
+    .header-meta span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
     .header-meta .sep {
-      margin: 0 8px;
-      opacity: 0.5;
+      display: none;
     }
     .fullcontext-section {
-      margin-bottom: 24px;
+      background: var(--vscode-sideBar-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      transition: box-shadow 0.2s;
+    }
+    .fullcontext-section:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
     }
     .section-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 12px;
+      padding: 12px 16px;
+      background: var(--vscode-editorGroupHeader-tabsBackground);
+      border-bottom: 1px solid var(--vscode-panel-border);
     }
     .section-title {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--vscode-foreground);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      opacity: 0.9;
     }
     .copy-btn {
-      padding: 4px 10px;
+      padding: 5px 12px;
       font-size: 11px;
-      background: transparent;
+      font-weight: 500;
+      background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
-      border: 1px solid var(--vscode-button-border);
-      border-radius: 3px;
+      border: none;
+      border-radius: 4px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: all 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     .copy-btn:hover {
       background: var(--vscode-button-hoverBackground);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+    .copy-btn:active {
+      transform: translateY(0);
     }
     .section-body {
-      padding: 12px;
-      background: var(--vscode-textBlockQuote-background);
-      border-left: 3px solid var(--vscode-textBlockQuote-border);
-      border-radius: 4px;
+      padding: 16px;
+      background: var(--vscode-editor-background);
     }
     .markdown-content {
       font-size: 12px;
-      line-height: 1.6;
+      line-height: 1.7;
       color: var(--vscode-foreground);
       overflow-x: auto;
       max-height: 500px;
       overflow-y: auto;
+      padding: 4px;
     }
     .markdown-content pre {
       background: var(--vscode-textCodeBlock-background);
-      padding: 12px;
+      padding: 14px;
       border-radius: 4px;
       overflow-x: auto;
-      margin: 8px 0;
+      margin: 10px 0;
+      border: 1px solid var(--vscode-panel-border);
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
     }
     .markdown-content code {
-      font-family: monospace;
+      font-family: 'SF Mono', Monaco, monospace;
       font-size: 11px;
       background: var(--vscode-textCodeBlock-background);
-      padding: 2px 4px;
+      padding: 3px 6px;
       border-radius: 3px;
+      border: 1px solid var(--vscode-panel-border);
     }
     .markdown-content pre code {
       background: none;
       padding: 0;
+      border: none;
+    }
+    .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+      margin: 16px 0 8px 0;
+      font-weight: 600;
+    }
+    .markdown-content ul {
+      margin: 8px 0;
+      padding-left: 24px;
+    }
+    .markdown-content li {
+      margin: 4px 0;
     }
     .file-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+      display: grid;
+      gap: 10px;
     }
     .file-item {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr auto;
       align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
+      gap: 12px;
+      padding: 12px 16px;
       background: var(--vscode-sideBar-background);
       border: 1px solid var(--vscode-panel-border);
       border-radius: 4px;
+      border-left: 3px solid var(--vscode-textLink-foreground);
       cursor: pointer;
-      transition: all 0.15s;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .file-item:hover {
       background: var(--vscode-list-hoverBackground);
-      border-color: var(--vscode-focusBorder);
-      transform: translateX(2px);
+      border-left-color: var(--vscode-focusBorder);
+      transform: translateX(4px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
     .file-path {
-      flex: 1;
       font-size: 12px;
       color: var(--vscode-textLink-foreground);
-      font-family: monospace;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .file-ranges {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--vscode-descriptionForeground);
+      padding: 4px 8px;
+      background: var(--vscode-badge-background);
+      border-radius: 3px;
+      font-family: monospace;
+      font-weight: 500;
     }
     .empty {
       text-align: center;
-      padding: 20px;
+      padding: 40px 20px;
       color: var(--vscode-descriptionForeground);
-      font-size: 12px;
+      font-size: 13px;
+      font-style: italic;
     }
   </style>
 </head>
@@ -1357,20 +1435,22 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
         textInfo.style.display = 'flex';
         textInfo.style.alignItems = 'center';
         textInfo.style.gap = '8px';
+        textInfo.style.right = '10px';
         textInfo.style.fontSize = '11px';
         textInfo.style.color = 'var(--vscode-foreground)';
         textInfo.style.opacity = '0.8';
         
         textInfo.innerHTML = \`
-          <span style="font-family: monospace; font-size: 10px; color: var(--vscode-descriptionForeground);">\${ctx.id.substring(0, 8)}</span>
-          <span style="font-size: 10px; color: var(--vscode-descriptionForeground);">\${date}</span>
+          <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px;">\${ctx.prompt.substring(0, 50)}\${ctx.prompt.length > 50 ? '...' : ''}</span>
+          <span style="font-family: monospace; font-size: 10px; color: var(--vscode-descriptionForeground); flex-shrink: 0;">\${ctx.id.substring(0, 8)}</span>
+          <span style="font-size: 10px; color: var(--vscode-descriptionForeground); flex-shrink: 0;">\${date}</span>
         \`;
         row.appendChild(textInfo);
         
         // Hover detail (hidden by default)
         const hoverDetail = document.createElement('div');
         hoverDetail.className = 'git-timeline-hover';
-        hoverDetail.style.position = 'fixed';
+        hoverDetail.style.position = 'absolute';
         hoverDetail.style.display = 'none';
         hoverDetail.style.background = 'var(--vscode-editorHoverWidget-background)';
         hoverDetail.style.border = '1px solid var(--vscode-editorHoverWidget-border)';
@@ -1378,8 +1458,11 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
         hoverDetail.style.padding = '10px 12px';
         hoverDetail.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
         hoverDetail.style.zIndex = '1000';
+        hoverDetail.style.minWidth = '250px';
         hoverDetail.style.maxWidth = '350px';
         hoverDetail.style.pointerEvents = 'none';
+        hoverDetail.style.left = '110%';
+        hoverDetail.style.top = '-10px';
         
         hoverDetail.innerHTML = \`
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
@@ -1387,31 +1470,24 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
             <span style="font-size: 11px; color: var(--vscode-descriptionForeground);">\${info.label}</span>
             <span style="font-family: monospace; font-size: 10px; padding: 2px 6px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); border-radius: 3px;">\${ctx.id.substring(0, 8)}</span>
           </div>
-          <div style="font-size: 11px; color: var(--vscode-editorHoverWidget-foreground); margin-bottom: 6px; line-height: 1.4;">\${ctx.prompt.substring(0, 120)}\${ctx.prompt.length > 120 ? '...' : ''}</div>
-          <div style="font-size: 10px; color: var(--vscode-descriptionForeground); display: flex; gap: 12px;">
+          <div style="font-size: 11px; color: var(--vscode-editorHoverWidget-foreground); margin-bottom: 6px; line-height: 1.4; word-wrap: break-word;">\${ctx.prompt.substring(0, 150)}\${ctx.prompt.length > 150 ? '...' : ''}</div>
+          <div style="font-size: 10px; color: var(--vscode-descriptionForeground); display: flex; flex-wrap: wrap; gap: 8px;">
             <span>📄 \${ctx.files} files</span>
             <span>🔢 \${ctx.tokens} tokens</span>
             <span>🕐 \${date}</span>
           </div>
         \`;
         
+        row.appendChild(hoverDetail);
+        
         row.addEventListener('mouseenter', function(e) {
           hoverDetail.style.display = 'block';
-          const rect = row.getBoundingClientRect();
-          hoverDetail.style.left = (rect.right + 10) + 'px';
-          hoverDetail.style.top = Math.max(10, rect.top - 20) + 'px';
         });
         
         row.addEventListener('mouseleave', function() {
           hoverDetail.style.display = 'none';
         });
         
-        row.addEventListener('mousemove', function(e) {
-          const rect = row.getBoundingClientRect();
-          hoverDetail.style.top = Math.max(10, e.clientY - 30) + 'px';
-        });
-        
-        document.body.appendChild(hoverDetail);
         graphContainer.appendChild(row);
       });
       
@@ -1515,22 +1591,22 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       const thinkingRendered = window.renderMarkdown(data.thinking || '(없음)');
       
       contentDiv.innerHTML = \`
-        <div class="fullcontext-header">
+        <div class="fullcontext-header" style="position: relative;">
           <div class="header-left">
-            <h1>AI Context</h1>
+            <h1>🧬 AI Context</h1>
             <span class="id-badge">\${data.id.substring(0, 8)}</span>
           </div>
           <div class="header-meta">
-            <span>\${date}</span>
-            <span class="sep">·</span>
-            <span>\${data.files.length} files</span>
+            <span>🕐 \${date}</span>
+            <span>📄 \${data.files.length} files</span>
+            <span>🔢 \${data.files.reduce((sum, f) => sum + f.lineRanges.length, 0)} ranges</span>
           </div>
         </div>
 
         <div class="fullcontext-section">
           <div class="section-header">
-            <span class="section-title">Prompt</span>
-            <button class="copy-btn" data-copy-type="prompt">Copy</button>
+            <span class="section-title">💬 Prompt</span>
+            <button class="copy-btn" data-copy-type="prompt">📋 Copy</button>
           </div>
           <div class="section-body">
             <div class="markdown-content">\${promptRendered}</div>
@@ -1539,8 +1615,8 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
 
         <div class="fullcontext-section">
           <div class="section-header">
-            <span class="section-title">AI Thinking</span>
-            <button class="copy-btn" data-copy-type="thinking">Copy</button>
+            <span class="section-title">✨ AI Response</span>
+            <button class="copy-btn" data-copy-type="thinking">📋 Copy</button>
           </div>
           <div class="section-body">
             <div class="markdown-content">\${thinkingRendered}</div>
@@ -1549,19 +1625,19 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
 
         <div class="fullcontext-section">
           <div class="section-header">
-            <span class="section-title">Files (\${data.files.length})</span>
+            <span class="section-title">📁 Files & Ranges</span>
           </div>
           <div class="section-body">
             \${data.files.length > 0 ? \`
               <div class="file-list">
                 \${data.files.map((f, idx) => \`
                   <div class="file-item" data-file-index="\${idx}">
-                    <div class="file-path">\${f.filePath}</div>
+                    <div class="file-path" title="\${f.filePath}">📄 \${f.filePath}</div>
                     <div class="file-ranges">\${f.lineRanges.map(r => \`\${r.start}-\${r.end}\`).join(', ')}</div>
                   </div>
                 \`).join('')}
               </div>
-            \` : '<div class="empty">No files</div>'}
+            \` : '<div class="empty">No files attached</div>'}
           </div>
         </div>
       \`;
