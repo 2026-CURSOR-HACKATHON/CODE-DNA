@@ -4,18 +4,18 @@ AI가 생성한 코드에 대한 프롬프트와 의도를 추적하는 VS Code 
 
 ## 🎯 POC 진행 상황
 
-### ✅ Day 1-2: Cursor DB 접근 검증 (완료)
+### Cursor DB 접근 검증 
 - sql.js로 Cursor의 state.vscdb 읽기 성공
 - Composer 45개 읽기 성공
 - Bubble 385개 읽기 성공
 - 데이터 구조 검증 완료
 
-### ✅ Day 3: Hover Provider 구현 (완료)
+### Hover Provider 구현
 - VS Code Hover Provider 등록
 - 하드코딩된 메타데이터로 Hover 표시
 - TypeScript 파일에서 Hover 활성화
 
-## 🚀 POC Day 3 테스트 방법
+## 🚀 POC 테스트
 
 ### 1. Extension 실행
 
@@ -86,7 +86,7 @@ npm run watch
 node test-poc.js
 ```
 
-## 📊 POC Day 3 구현 내용
+## 📊 POC 구현 내용
 
 ### AIContextHoverProvider 클래스
 
@@ -125,7 +125,7 @@ class AIContextHoverProvider implements vscode.HoverProvider {
 }
 ```
 
-## 🎯 다음 단계 (Phase 1 MVP)
+## 🎯 투두 리스트 (지속적 업데이트)
 
 - [ ] AI 응답 자동 감지 (5초 폴링)
 - [ ] 파일 변경 추적 (FileSystemWatcher)
