@@ -14,7 +14,7 @@ function escapeAttr(s: string): string {
 export interface FullContextData {
   id: string;
   prompt: string;
-  thinking: string;
+  aiResponse: string;
   timestamp: number;
   files: { filePath: string; lineRanges: { start: number; end: number }[] }[];
   timestampStr?: string;
@@ -62,7 +62,7 @@ function renderMarkdown(md: string): string {
 export function getFullContextWebviewContent(data: FullContextData): string {
   const timeStr = data.timestampStr ?? new Date(data.timestamp).toLocaleString('ko-KR');
   const promptRendered = renderMarkdown(data.prompt || '(없음)');
-  const thinkingRendered = renderMarkdown(data.thinking || '(없음)');
+  const aiResponseRendered = renderMarkdown(data.aiResponse || '(없음)');
   const fileList = data.files?.length
     ? data.files.map((f) => `${f.filePath} (${f.lineRanges.map((r) => `${r.start}-${r.end}`).join(', ')})`).join('\n')
     : '(없음)';
@@ -368,11 +368,11 @@ export function getFullContextWebviewContent(data: FullContextData): string {
 
     <div class="section">
       <div class="section-header">
-        <span class="section-title">AI Thinking</span>
-        <button data-action="copy" data-target="thinking">Copy</button>
+        <span class="section-title">AI Response</span>
+        <button data-action="copy" data-target="aiResponse">Copy</button>
       </div>
       <div class="section-body">
-        <div class="markdown-content">${thinkingRendered}</div>
+        <div class="markdown-content">${aiResponseRendered}</div>
       </div>
     </div>
 
@@ -405,8 +405,8 @@ export function getFullContextWebviewContent(data: FullContextData): string {
       const vscode = acquireVsCodeApi && acquireVsCodeApi();
       const contextId = ${JSON.stringify(data.id)};
       const promptText = ${JSON.stringify(data.prompt || '(없음)')};
-      const thinkingText = ${JSON.stringify(data.thinking || '(없음)')};
-      const allText = '[Prompt]\\n' + promptText + '\\n\\n[AI Thinking]\\n' + thinkingText;
+      const aiResponseText = ${JSON.stringify(data.aiResponse || '(없음)')};
+      const allText = '[Prompt]\\n' + promptText + '\\n\\n[AI Response]\\n' + aiResponseText;
       const filesData = ${JSON.stringify(data.files || [])};
 
       document.querySelectorAll('[data-action="copy"]').forEach(function(btn) {
@@ -414,7 +414,7 @@ export function getFullContextWebviewContent(data: FullContextData): string {
           const target = btn.getAttribute('data-target');
           var text = '';
           if (target === 'prompt') text = promptText;
-          else if (target === 'thinking') text = thinkingText;
+          else if (target === 'aiResponse') text = aiResponseText;
           else if (target === 'all') text = allText;
           if (text && vscode) vscode.postMessage({ type: 'copy', text: text });
         });
@@ -427,7 +427,7 @@ export function getFullContextWebviewContent(data: FullContextData): string {
               type: 'tagToChat', 
               contextId: contextId,
               prompt: promptText,
-              thinking: thinkingText
+              aiResponse: aiResponseText
             });
           }
         });

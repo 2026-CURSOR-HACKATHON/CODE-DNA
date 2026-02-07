@@ -3,10 +3,10 @@ import { MetadataStore } from './metadataStore';
 import { AICodeMetadata } from '../cursor/types';
 
 /**
- * 기능 1-6: Cursor DB에서 prompt/thinking 추출 후 metadata.json에 저장
+ * 기능 1-6: Cursor DB에서 prompt/aiResponse 추출 후 metadata.json에 저장
  * - 기능 1-1: cursorDiskKV 테이블, composerData:{id}, bubbleId:{composerId}:{bubbleId} 패턴으로 읽기
  * - prompt: 해당 AI 버블 직전의 user 버블 text (Cursor DB에서 추출)
- * - thinking: 해당 AI 버블의 assistant text (Cursor DB에서 추출, extractBubbleText로 본문 추출)
+ * - aiResponse: 해당 AI 버블의 assistant text (Cursor DB에서 추출, extractBubbleText로 본문 추출)
  */
 export async function saveMetadataFromCursorDB(
   cursorDB: CursorDB,
@@ -23,7 +23,7 @@ export async function saveMetadataFromCursorDB(
   metadataStore.ensureDir();
 
   let prompt = '';
-  let thinking = '';
+  let aiResponse = '';
   const didOpen = !cursorDB.isOpen();
 
   try {
@@ -38,7 +38,7 @@ export async function saveMetadataFromCursorDB(
         : userBubbles[userBubbles.length - 1];
       if (lastUser) prompt = lastUser.text;
     }
-    if (aiBubble) thinking = aiBubble.text;
+    if (aiBubble) aiResponse = aiBubble.text;
   } finally {
     if (didOpen) cursorDB.close();
   }
@@ -74,8 +74,8 @@ export async function saveMetadataFromCursorDB(
     bubbleId,
     composerId,
     prompt: prompt || '(프롬프트 없음)',
-    thinking: thinking || '(응답 없음)',
-    aiResponse: thinking || '(응답 없음)',
+    aiResponse: aiResponse || '(응답 없음)',
+    thinking: aiResponse || '(응답 없음)', // 하위 호환
     files: effectiveFiles,
     filesChanged,
     lineRanges,
@@ -93,8 +93,8 @@ export async function saveMetadataFromCursorDB(
     preview(entry.prompt, 200)
   );
   console.log(
-    '[saveMetadataFromCursorDB] thinking (앞 200자):',
-    preview(entry.thinking ?? '(응답 없음)', 200)
+    '[saveMetadataFromCursorDB] aiResponse (앞 200자):',
+    preview(entry.aiResponse ?? '(응답 없음)', 200)
   );
   metadataStore.upsertMetadata(entry);
 }

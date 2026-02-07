@@ -126,11 +126,11 @@ export class MetadataStore {
     } else {
       const existing = list[existingIndex];
 
-      // thinking: 기존에 값이 있는데 새 값이 "(응답 없음)"이면 기존 유지, 아니면 새 값 사용
-      const mergedThinking =
-        existing.thinking && existing.thinking !== '(응답 없음)' && entry.thinking === '(응답 없음)'
-          ? existing.thinking
-          : entry.thinking ?? existing.thinking;
+      // aiResponse: 기존에 값이 있는데 새 값이 "(응답 없음)"이면 기존 유지, 아니면 새 값 사용
+      const mergedAiResponse =
+        existing.aiResponse && existing.aiResponse !== '(응답 없음)' && entry.aiResponse === '(응답 없음)'
+          ? existing.aiResponse
+          : entry.aiResponse ?? existing.aiResponse ?? entry.thinking ?? existing.thinking;
 
       // files: 기존 + 새 files 병합. 같은 filePath는 한 번만 유지 (중복 추가 금지)
       const existingFiles: { filePath: string; lineRanges: { start: number; end: number }[] }[] =
@@ -153,7 +153,8 @@ export class MetadataStore {
       list[existingIndex] = {
         ...existing,
         ...entry,
-        thinking: mergedThinking,
+        aiResponse: mergedAiResponse,
+        thinking: mergedAiResponse, // 하위 호환
         files: mergedFiles as any,
       };
     }

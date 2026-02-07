@@ -175,7 +175,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       context: {
         id: contextId,
         prompt: meta.prompt,
-        thinking: meta.thinking,
+        aiResponse: meta.aiResponse ?? meta.thinking,
       },
     });
   }
@@ -214,7 +214,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
         for (const ctxId of attachedContexts) {
           const meta = this.metadataStore.getMetadataByBubbleId(ctxId);
           if (meta) {
-            contextTexts.push(`[Context ${ctxId.substring(0, 8)}]\nPrompt: ${meta.prompt}\nResponse: ${meta.thinking}`);
+            contextTexts.push(`[Context ${ctxId.substring(0, 8)}]\nPrompt: ${meta.prompt}\nResponse: ${meta.aiResponse ?? meta.thinking}`);
           }
         }
         if (contextTexts.length > 0) {
@@ -272,7 +272,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
         data: {
           id: contextId,
           prompt: entry.prompt ?? '',
-          thinking: entry.thinking ?? '',
+          aiResponse: entry.aiResponse ?? entry.thinking ?? '',
           timestamp: entry.timestamp,
           files: entry.changes.map((c: any) => ({ filePath: c.filePath, lineRanges: c.lineRanges })),
         }
@@ -288,7 +288,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       data: {
         id: contextId,
         prompt: meta.prompt ?? '',
-        thinking: meta.thinking ?? '',
+        aiResponse: meta.aiResponse ?? meta.thinking ?? '',
         timestamp: meta.timestamp,
         files: meta.files ?? (meta.filePath && meta.lineRanges ? [{ filePath: meta.filePath, lineRanges: meta.lineRanges }] : []),
       }
@@ -369,7 +369,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       context: {
         id: contextId,
         prompt: meta.prompt,
-        thinking: meta.thinking,
+        aiResponse: meta.aiResponse ?? meta.thinking,
       },
     });
   }
@@ -1587,7 +1587,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       
       const date = new Date(data.timestamp).toLocaleString('ko-KR');
       const promptRendered = window.renderMarkdown(data.prompt || '(없음)');
-      const thinkingRendered = window.renderMarkdown(data.thinking || '(없음)');
+      const aiResponseRendered = window.renderMarkdown(data.aiResponse || '(없음)');
       
       contentDiv.innerHTML = \`
         <div class="fullcontext-header" style="position: relative;">
@@ -1615,10 +1615,10 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
         <div class="fullcontext-section">
           <div class="section-header">
             <span class="section-title">AI Response</span>
-            <button class="copy-btn" data-copy-type="thinking">Copy</button>
+            <button class="copy-btn" data-copy-type="aiResponse">Copy</button>
           </div>
           <div class="section-body">
-            <div class="markdown-content">\${thinkingRendered}</div>
+            <div class="markdown-content">\${aiResponseRendered}</div>
           </div>
         </div>
 
@@ -1651,8 +1651,8 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
             let textToCopy = '';
             if (copyType === 'prompt') {
               textToCopy = data.prompt || '';
-            } else if (copyType === 'thinking') {
-              textToCopy = data.thinking || '';
+            } else if (copyType === 'aiResponse') {
+              textToCopy = data.aiResponse || '';
             }
             vscode.postMessage({ type: 'copy', text: textToCopy });
           });

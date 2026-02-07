@@ -132,7 +132,7 @@ export class AIContextHoverProvider implements vscode.HoverProvider {
       // Response 섹션
       markdown.appendMarkdown(`$(sparkle) **RESPONSE**\n\n`);
       markdown.appendCodeblock(
-        this.truncate(entry.thinking ?? '(없음)', THINKING_PREVIEW_LEN), 
+        this.truncate(entry.aiResponse ?? entry.thinking ?? '(없음)', THINKING_PREVIEW_LEN), 
         'markdown'
       );
       markdown.appendMarkdown('\n');
@@ -219,10 +219,10 @@ export class AIContextHoverProvider implements vscode.HoverProvider {
       }
 
       // Response 섹션
-      if (entry.thinking) {
+      if (entry.aiResponse || entry.thinking) {
         markdown.appendMarkdown(`$(sparkle) **RESPONSE**\n\n`);
         markdown.appendCodeblock(
-          this.truncate(entry.thinking, THINKING_PREVIEW_LEN), 
+          this.truncate(entry.aiResponse ?? entry.thinking ?? '', THINKING_PREVIEW_LEN), 
           'markdown'
         );
         markdown.appendMarkdown('\n');

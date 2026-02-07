@@ -393,7 +393,7 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
           const data: FullContextData = {
             id,
             prompt: meta.prompt ?? '',
-            thinking: meta.thinking ?? '',
+            aiResponse: meta.aiResponse ?? meta.thinking ?? '',
             timestamp: meta.timestamp,
             files,
             timestampStr: meta.timestampStr ?? new Date(meta.timestamp).toLocaleString('ko-KR'),
@@ -498,7 +498,7 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
         const data: FullContextData = {
           id,
           prompt: entry.prompt ?? '',
-          thinking: entry.thinking ?? '',
+          aiResponse: entry.aiResponse ?? entry.thinking ?? '',
           timestamp: entry.timestamp,
           files: entry.changes.map((c) => ({ filePath: c.filePath, lineRanges: c.lineRanges })),
           timestampStr: new Date(entry.timestamp).toLocaleString('ko-KR'),
@@ -592,7 +592,7 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
         const store = new MetadataStore(root);
         const meta = store.getMetadataByBubbleId(id);
         if (meta) {
-          const text = `[프롬프트]\n${meta.prompt}\n\n[AI Thinking]\n${meta.thinking}`;
+          const text = `[프롬프트]\n${meta.prompt}\n\n[AI Response]\n${meta.aiResponse ?? meta.thinking}`;
           await vscode.env.clipboard.writeText(text);
           vscode.window.showInformationMessage('클립보드에 복사했습니다.');
           return;
@@ -604,8 +604,9 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
         }
         const parts: string[] = [];
         if (entry.prompt) parts.push(`[프롬프트]\n${entry.prompt}`);
-        if (entry.thinking) parts.push(`[AI Thinking]\n${entry.thinking}`);
-        const text = parts.length ? parts.join('\n\n') : `Context ${id.substring(0, 7)} (프롬프트/thinking 없음)`;
+        const response = entry.aiResponse ?? entry.thinking;
+        if (response) parts.push(`[AI Response]\n${response}`);
+        const text = parts.length ? parts.join('\n\n') : `Context ${id.substring(0, 7)} (프롬프트/응답 없음)`;
         await vscode.env.clipboard.writeText(text);
         vscode.window.showInformationMessage('클립보드에 복사했습니다.');
       }

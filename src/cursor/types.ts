@@ -33,8 +33,10 @@ export interface AiContextEntry {
   commitHash: string;
   timestamp: number;
   changes: { filePath: string; lineRanges: { start: number; end: number }[] }[];
-  /** 선택: prompt/thinking 등 (있으면 Hover에 표시) */
+  /** 선택: prompt/aiResponse 등 (있으면 Hover에 표시) */
   prompt?: string;
+  aiResponse?: string;
+  /** @deprecated Use aiResponse instead */
   thinking?: string;
   /** 선택: 토큰 수 (메타 정보용) */
   token?: number;
