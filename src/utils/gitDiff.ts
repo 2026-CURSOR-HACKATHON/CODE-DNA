@@ -141,7 +141,6 @@ export async function getDiffLineRanges(
   }
 
   // untracked 파일 처리: 전체 파일이 새로 추가된 것으로 간주
-  const filePaths = options?.filePaths ? new Set(options.filePaths.map((p) => path.normalize(p))) : null;
   for (const untrackedFile of untrackedFiles) {
     const normalized = path.normalize(untrackedFile).replace(/\\/g, '/');
     
