@@ -1,0 +1,66 @@
+{
+  "name": "ai-context-tracker",
+  "displayName": "AI Context Tracker",
+  "description": "Track AI-generated code with prompts and intent in VS Code",
+  "version": "0.0.1",
+  "publisher": "minsung",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ai-context-tracker.diagnose",
+        "title": "AI Context Tracker: 진단 (디버깅)"
+      },
+      {
+        "command": "ai-context-tracker.startDetector",
+        "title": "AI Context Tracker: Start Detector"
+      },
+      {
+        "command": "ai-context-tracker.stopDetector",
+        "title": "AI Context Tracker: Stop Detector"
+      },
+      {
+        "command": "ai-context-tracker.resetDetector",
+        "title": "AI Context Tracker: Reset Detector"
+      },
+      {
+        "command": "ai-context-tracker.showFullContext",
+        "title": "AI Context Tracker: 전체 보기"
+      },
+      {
+        "command": "ai-context-tracker.copyContext",
+        "title": "AI Context Tracker: 복사"
+      },
+      {
+        "command": "ai-context-tracker.saveLatestToMetadata",
+        "title": "AI Context Tracker: 최근 AI 응답을 메타데이터로 저장"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "parse-diff": "^0.11.1",
+    "simple-git": "^3.30.0",
+    "sql.js": "^1.10.2"
+  }
+}
