@@ -37,106 +37,250 @@ export function getFullContextWebviewContent(data: FullContextData): string {
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: var(--vscode-font-family);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
       font-size: 13px;
       color: var(--vscode-foreground);
       background: var(--vscode-editor-background);
-      padding: 16px 20px;
+      padding: 0;
       margin: 0;
       line-height: 1.5;
     }
-    h1 {
-      font-size: 1.25rem;
-      margin: 0 0 12px 0;
-      padding-bottom: 8px;
-      border-bottom: 1px solid var(--vscode-widget-border);
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      padding: 12px 16px;
     }
-    .tags {
+    .header-row {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 16px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
     }
-    .tag {
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+      letter-spacing: -0.2px;
+    }
+    .id-badge {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
       font-size: 11px;
-      padding: 4px 8px;
-      border-radius: 4px;
+      padding: 2px 6px;
+      border-radius: 3px;
       background: var(--vscode-badge-background);
       color: var(--vscode-badge-foreground);
+      white-space: nowrap;
     }
-    section {
-      margin-bottom: 20px;
-    }
-    section h2 {
-      font-size: 0.9rem;
-      margin: 0 0 8px 0;
-      color: var(--vscode-descriptionForeground);
-    }
-    .block {
-      padding: 12px 14px;
-      border-radius: 6px;
-      background: var(--vscode-textBlockQuote-background);
-      border-left: 4px solid var(--vscode-focusBorder);
-      white-space: pre-wrap;
-      word-break: break-word;
-      max-height: 40vh;
-      overflow-y: auto;
-    }
-    .meta-block {
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       font-size: 12px;
       color: var(--vscode-descriptionForeground);
+      white-space: nowrap;
+    }
+    .sep {
+      color: var(--vscode-panel-border);
+    }
+    .content {
+      padding: 16px;
+    }
+    .section {
+      margin-bottom: 16px;
+    }
+    .section:last-child {
+      margin-bottom: 0;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--vscode-sideBar-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .section-body {
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 0 0 6px 6px;
+      background: var(--vscode-editor-background);
+    }
+    .code-block {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      padding: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 300px;
+      overflow-y: auto;
+      margin: 0;
+    }
+    .code-block::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .code-block::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .code-block::-webkit-scrollbar-thumb {
+      background: var(--vscode-scrollbarSlider-background);
+      border-radius: 3px;
+    }
+    .code-block::-webkit-scrollbar-thumb:hover {
+      background: var(--vscode-scrollbarSlider-hoverBackground);
+    }
+    .file-list {
+      margin: 0;
+      padding: 8px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      border-radius: 3px;
+      background: var(--vscode-sideBar-background);
+      border: 1px solid var(--vscode-panel-border);
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 11px;
+      transition: background 0.1s ease;
+    }
+    .file-item:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
+    .file-item:last-child {
+      margin-bottom: 0;
+    }
+    .file-path {
+      flex: 1;
+      color: var(--vscode-textLink-foreground);
+      word-break: break-all;
+      min-width: 0;
+    }
+    .file-ranges {
+      color: var(--vscode-descriptionForeground);
+      white-space: nowrap;
+      font-size: 10px;
     }
     .actions {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 16px;
+      gap: 6px;
     }
     button {
       font-family: inherit;
-      font-size: 12px;
-      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
       border-radius: 4px;
-      border: 1px solid var(--vscode-button-border);
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
+      border: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
       cursor: pointer;
+      transition: all 0.1s ease;
+      white-space: nowrap;
     }
     button:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+      border-color: var(--vscode-focusBorder);
+    }
+    button:active {
+      transform: scale(0.98);
+    }
+    button.primary {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border-color: var(--vscode-button-border);
+    }
+    button.primary:hover {
       background: var(--vscode-button-hoverBackground);
     }
-    button.secondary {
-      background: transparent;
-      color: var(--vscode-foreground);
+    .empty {
+      padding: 24px 12px;
+      text-align: center;
+      color: var(--vscode-descriptionForeground);
+      font-size: 12px;
     }
   </style>
 </head>
 <body>
-  <h1>AI Context · ${escapeHtml(data.id.substring(0, 8))}</h1>
-  <div class="tags">
-    <span class="tag">📅 ${escapeHtml(timeStr)}</span>
-    <span class="tag">📁 파일 ${data.files?.length ?? 0}개</span>
+  <div class="header">
+    <div class="header-row">
+      <div class="header-left">
+        <h1>AI Context</h1>
+        <span class="id-badge">${escapeHtml(data.id.substring(0, 8))}</span>
+      </div>
+      <div class="header-meta">
+        <span>${escapeHtml(timeStr)}</span>
+        <span class="sep">·</span>
+        <span>${data.files?.length ?? 0} files</span>
+      </div>
+    </div>
   </div>
 
-  <section>
-    <h2>프롬프트</h2>
-    <div class="block" id="prompt-text">${promptEsc.replace(/&#10;/g, '<br>')}</div>
-    <button class="secondary" data-action="copy" data-target="prompt">프롬프트 복사</button>
-  </section>
+  <div class="content">
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Prompt</span>
+        <button data-action="copy" data-target="prompt">Copy</button>
+      </div>
+      <div class="section-body">
+        <pre class="code-block">${promptEsc.replace(/&#10;/g, '\n')}</pre>
+      </div>
+    </div>
 
-  <section>
-    <h2>AI Thinking</h2>
-    <div class="block" id="thinking-text">${thinkingEsc.replace(/&#10;/g, '<br>')}</div>
-    <button class="secondary" data-action="copy" data-target="thinking">Thinking 복사</button>
-  </section>
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">AI Thinking</span>
+        <button data-action="copy" data-target="thinking">Copy</button>
+      </div>
+      <div class="section-body">
+        <pre class="code-block">${thinkingEsc.replace(/&#10;/g, '\n')}</pre>
+      </div>
+    </div>
 
-  <section>
-    <h2>연결된 파일</h2>
-    <div class="block meta-block" id="files-text">${fileListEsc.replace(/&#10;/g, '<br>')}</div>
-  </section>
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Files (${data.files?.length ?? 0})</span>
+      </div>
+      <div class="section-body">
+        ${data.files?.length ? `
+        <div class="file-list">
+          ${data.files.map((f) => `
+            <div class="file-item">
+              <div class="file-path">${escapeHtml(f.filePath)}</div>
+              <div class="file-ranges">${f.lineRanges.map((r) => `${r.start}-${r.end}`).join(', ')}</div>
+            </div>
+          `).join('')}
+        </div>
+        ` : '<div class="empty">No files</div>'}
+      </div>
+    </div>
 
-  <div class="actions">
-    <button data-action="copy" data-target="all">전체 복사</button>
+    <div class="actions" style="margin-top: 16px;">
+      <button class="primary" data-action="copy" data-target="all">Copy All</button>
+      <button class="primary" data-action="AI" data-target="prompt">AI 어쩌고</button>
+    </div>
   </div>
 
   <script>
@@ -144,7 +288,7 @@ export function getFullContextWebviewContent(data: FullContextData): string {
       const vscode = acquireVsCodeApi && acquireVsCodeApi();
       const promptText = ${JSON.stringify(data.prompt || '(없음)')};
       const thinkingText = ${JSON.stringify(data.thinking || '(없음)')};
-      const allText = '[프롬프트]\\n' + promptText + '\\n\\n[AI Thinking]\\n' + thinkingText;
+      const allText = '[Prompt]\\n' + promptText + '\\n\\n[AI Thinking]\\n' + thinkingText;
 
       document.querySelectorAll('[data-action="copy"]').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -154,6 +298,15 @@ export function getFullContextWebviewContent(data: FullContextData): string {
           else if (target === 'thinking') text = thinkingText;
           else if (target === 'all') text = allText;
           if (text && vscode) vscode.postMessage({ type: 'copy', text: text });
+        });
+      });
+
+      document.querySelectorAll('[data-action="AI"]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          const target = btn.getAttribute('data-target');
+          if (target === 'prompt') {
+            vscode.postMessage({ type: 'AI', text: promptText });
+          }
         });
       });
     })();
