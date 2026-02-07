@@ -300,15 +300,6 @@ export function getFullContextWebviewContent(data: FullContextData): string {
           if (text && vscode) vscode.postMessage({ type: 'copy', text: text });
         });
       });
-
-      document.querySelectorAll('[data-action="AI"]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          const target = btn.getAttribute('data-target');
-          if (target === 'prompt') {
-            vscode.postMessage({ type: 'AI', text: promptText });
-          }
-        });
-      });
     })();
   </script>
 </body>
