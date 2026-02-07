@@ -15,6 +15,24 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codeDNA",
+          "title": "CODE-DNA",
+          "icon": "$(dna)"
+        }
+      ]
+    },
+    "views": {
+      "codeDNA": [
+        {
+          "type": "webview",
+          "id": "codeDNA.sidebar",
+          "name": "AI Context Tracker"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "ai-context-tracker.diagnose",

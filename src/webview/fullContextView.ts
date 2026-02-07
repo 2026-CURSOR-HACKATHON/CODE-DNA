@@ -391,14 +391,16 @@ export function getFullContextWebviewContent(data: FullContextData): string {
       </div>
     </div>
 
-    <div class="actions" style="margin-top: 16px;">
+    <div class="actions" style="margin-top: 16px; display: flex; gap: 8px;">
       <button class="primary" data-action="copy" data-target="all">Copy All</button>
+      <button class="primary" data-action="tagToChat">📎 Chat에 태그</button>
     </div>
   </div>
 
   <script>
     (function() {
       const vscode = acquireVsCodeApi && acquireVsCodeApi();
+      const contextId = ${JSON.stringify(data.id)};
       const promptText = ${JSON.stringify(data.prompt || '(없음)')};
       const thinkingText = ${JSON.stringify(data.thinking || '(없음)')};
       const allText = '[Prompt]\\n' + promptText + '\\n\\n[AI Thinking]\\n' + thinkingText;
@@ -411,6 +413,19 @@ export function getFullContextWebviewContent(data: FullContextData): string {
           else if (target === 'thinking') text = thinkingText;
           else if (target === 'all') text = allText;
           if (text && vscode) vscode.postMessage({ type: 'copy', text: text });
+        });
+      });
+      
+      document.querySelectorAll('[data-action="tagToChat"]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          if (vscode) {
+            vscode.postMessage({ 
+              type: 'tagToChat', 
+              contextId: contextId,
+              prompt: promptText,
+              thinking: thinkingText
+            });
+          }
         });
       });
     })();

@@ -66,3 +66,36 @@ export function getApiKey(keyName: string): string | undefined {
   const value = envCache[keyName];
   return value && value.length > 0 ? value : undefined;
 }
+
+/**
+ * API Key를 .env 파일에 저장
+ */
+export function setApiKey(workspaceRoot: string, keyName: string, value: string): void {
+  const envPath = path.join(workspaceRoot, ENV_FILENAME);
+  
+  let content = '';
+  if (fs.existsSync(envPath)) {
+    content = fs.readFileSync(envPath, 'utf-8');
+  }
+
+  // 기존 키가 있으면 업데이트, 없으면 추가
+  const lines = content.split('\n');
+  let found = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith(`${keyName}=`)) {
+      lines[i] = `${keyName}=${value}`;
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    lines.push(`${keyName}=${value}`);
+  }
+
+  fs.writeFileSync(envPath, lines.join('\n'), 'utf-8');
+  
+  // 환경 변수도 즉시 업데이트
+  envCache[keyName] = value;
+}

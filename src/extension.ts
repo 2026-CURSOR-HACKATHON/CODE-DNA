@@ -8,12 +8,14 @@ import { FileChangeTracker } from './detectors/fileChangeTracker';
 import { runAiContextPipeline } from './detectors/aiContextPipeline';
 import { getFullContextWebviewContent, FullContextData } from './webview/fullContextView';
 import { AIContextDecorator } from './decorations/aiContextDecorator';
-import { ensureEnv, loadEnv, getApiKey } from './config/env';
+import { SecretStorageManager } from './config/secretStorage';
 import { callOpenAIChat, callAIForContextText } from './services/externalApi';
+import { CodeDNASidebarProvider } from './views/sidebarProvider';
 
 let aiResponseDetector: AIResponseDetector | null = null;
 let fileChangeTracker: FileChangeTracker | null = null;
 let aiContextDecorator: AIContextDecorator | null = null;
+let sidebarProvider: CodeDNASidebarProvider | null = null;
 let initialized = false;
 let activeBubbleId: string | null = null;
 let activeBubbleStartedAt: number | null = null;
@@ -40,27 +42,30 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
     const metadataStore = new MetadataStore(workspaceRoot);
     metadataStore.ensureDir();
 
-    // 사용자가 연 프로젝트 루트에 익스텐션 전용 .env.ai-context-tracker 없으면 생성 후 로드
-    ensureEnv(workspaceRoot);
-    loadEnv(workspaceRoot);
-    const apiKey = getApiKey('OPENAI_API_KEY');
-    if (apiKey && !apiKey.includes('your-key-here')) {
-      // 콘솔 테스트: API 연동 확인용 (툴팁 미연동)
-      callOpenAIChat({
-        apiKey,
-        messages: [{ role: 'user', content: 'Say "API connected" in one short sentence.' }],
-        timeoutMs: 8000,
-      })
-        .then((result) => {
-          if (result.ok) {
-            console.log('[외부 AI API 연동] 테스트 성공:', result.text);
-          } else {
-            console.warn('[외부 AI API 연동] 테스트 실패:', result.error);
-          }
+    // SecretStorage를 통한 안전한 API 키 관리
+    const secretStorage = new SecretStorageManager(context);
+    const hasApiKey = await secretStorage.hasApiKey();
+    
+    if (hasApiKey) {
+      const apiKey = await secretStorage.getApiKey();
+      if (apiKey) {
+        // 콘솔 테스트: API 연동 확인용
+        callOpenAIChat({
+          apiKey,
+          messages: [{ role: 'user', content: 'Say "API connected" in one short sentence.' }],
+          timeoutMs: 8000,
         })
-        .catch((e) => console.warn('[외부 AI API 연동] 테스트 예외:', e instanceof Error ? e.message : e));
+          .then((result) => {
+            if (result.ok) {
+              console.log('[외부 AI API 연동] 테스트 성공:', result.text);
+            } else {
+              console.warn('[외부 AI API 연동] 테스트 실패:', result.error);
+            }
+          })
+          .catch((e) => console.warn('[외부 AI API 연동] 테스트 예외:', e instanceof Error ? e.message : e));
+      }
     } else {
-      console.log('[외부 AI API 연동] .env.ai-context-tracker에 OPENAI_API_KEY가 없거나 placeholder라 테스트를 건너뜁니다.');
+      console.log('[외부 AI API 연동] API Key가 설정되지 않았습니다. Sidebar에서 설정하세요.');
     }
 
     console.log('[Phase 1] 1단계: Hover Provider 등록 (모든 확장자)...');
@@ -80,6 +85,18 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
       },
     });
     console.log('[Phase 1] ✅ AI Context Decorator 시작 완료');
+
+    console.log('[Phase 1] 1-3단계: Sidebar Provider 등록...');
+    sidebarProvider = new CodeDNASidebarProvider(
+      vscode.Uri.file(context.extensionPath),
+      workspaceRoot,
+      metadataStore,
+      secretStorage
+    );
+    context.subscriptions.push(
+      vscode.window.registerWebviewViewProvider('codeDNA.sidebar', sidebarProvider)
+    );
+    console.log('[Phase 1] ✅ Sidebar Provider 등록 완료');
 
     console.log('[Phase 1] 2단계: File Change Tracker 시작 (기능 1-3)...');
     fileChangeTracker = new FileChangeTracker(workspaceRoot);
@@ -155,6 +172,10 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
                 if (aiContextDecorator) {
                   aiContextDecorator.refresh();
                 }
+                // Sidebar 업데이트
+                if (sidebarProvider) {
+                  sidebarProvider.refresh();
+                }
                 // 성공해도 30초 반복은 유지 → 다른 파일이 감지되면 계속 추가
                 return;
               }
@@ -202,6 +223,10 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
             // 데코레이션 업데이트
             if (aiContextDecorator) {
               aiContextDecorator.refresh();
+            }
+            // Sidebar 업데이트
+            if (sidebarProvider) {
+              sidebarProvider.refresh();
             }
           } catch (e) {
             console.error(
@@ -310,16 +335,28 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
               vscode.window.showInformationMessage('클립보드에 복사했습니다.');
               return;
             }
+            if (msg.type === 'tagToChat' && msg.contextId) {
+              // Sidebar로 컨텍스트 전달
+              if (sidebarProvider) {
+                sidebarProvider.tagContextToChat(msg.contextId);
+              }
+              vscode.window.showInformationMessage('Chat에 컨텍스트가 태그되었습니다.');
+              return;
+            }
             if (msg.type === 'AI' && typeof msg.text === 'string') {
-              loadEnv(root);
-              const apiKey = getApiKey('OPENAI_API_KEY');
-              if (!apiKey || apiKey.includes('your-key-here')) {
-                console.warn('[외부 AI API 연동] .env.ai-context-tracker에 OPENAI_API_KEY를 설정하세요.');
+              const hasKey = await secretStorage.hasApiKey();
+              if (!hasKey) {
+                vscode.window.showWarningMessage('API Key가 설정되지 않았습니다. Sidebar에서 설정하세요.');
+                return;
+              }
+              const apiKey = await secretStorage.getApiKey();
+              if (!apiKey) {
+                vscode.window.showWarningMessage('API Key를 가져올 수 없습니다.');
                 return;
               }
               const result = await callAIForContextText(apiKey, msg.text, {
-              prompt: '프롬프트 내용을 한 문장으로 요약해줘.',
-            });
+                prompt: '프롬프트 내용을 한 문장으로 요약해줘.',
+              });
               if (result.ok) {
                 console.log('[외부 AI API 연동] 응답:', result.text);
               } else {
@@ -356,10 +393,14 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
             return;
           }
           if (msg.type === 'AI' && typeof msg.text === 'string') {
-            loadEnv(root);
-            const apiKey = getApiKey('OPENAI_API_KEY');
-            if (!apiKey || apiKey.includes('your-key-here')) {
-              console.warn('[외부 AI API 연동] .env.ai-context-tracker에 OPENAI_API_KEY를 설정하세요.');
+            const hasKey = await secretStorage.hasApiKey();
+            if (!hasKey) {
+              vscode.window.showWarningMessage('API Key가 설정되지 않았습니다. Sidebar에서 설정하세요.');
+              return;
+            }
+            const apiKey = await secretStorage.getApiKey();
+            if (!apiKey) {
+              vscode.window.showWarningMessage('API Key를 가져올 수 없습니다.');
               return;
             }
             const result = await callAIForContextText(apiKey, msg.text, {
