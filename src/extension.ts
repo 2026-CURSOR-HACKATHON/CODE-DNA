@@ -8,6 +8,8 @@ import { FileChangeTracker } from './detectors/fileChangeTracker';
 import { runAiContextPipeline } from './detectors/aiContextPipeline';
 import { getFullContextWebviewContent, FullContextData } from './webview/fullContextView';
 import { AIContextDecorator } from './decorations/aiContextDecorator';
+import { ensureEnv, loadEnv, getApiKey } from './config/env';
+import { callOpenAIChat, callAIForContextText } from './services/externalApi';
 
 let aiResponseDetector: AIResponseDetector | null = null;
 let fileChangeTracker: FileChangeTracker | null = null;
@@ -37,6 +39,29 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
   try {
     const metadataStore = new MetadataStore(workspaceRoot);
     metadataStore.ensureDir();
+
+    // 사용자가 연 프로젝트 루트에 익스텐션 전용 .env.ai-context-tracker 없으면 생성 후 로드
+    ensureEnv(workspaceRoot);
+    loadEnv(workspaceRoot);
+    const apiKey = getApiKey('OPENAI_API_KEY');
+    if (apiKey && !apiKey.includes('your-key-here')) {
+      // 콘솔 테스트: API 연동 확인용 (툴팁 미연동)
+      callOpenAIChat({
+        apiKey,
+        messages: [{ role: 'user', content: 'Say "API connected" in one short sentence.' }],
+        timeoutMs: 8000,
+      })
+        .then((result) => {
+          if (result.ok) {
+            console.log('[외부 AI API 연동] 테스트 성공:', result.text);
+          } else {
+            console.warn('[외부 AI API 연동] 테스트 실패:', result.error);
+          }
+        })
+        .catch((e) => console.warn('[외부 AI API 연동] 테스트 예외:', e instanceof Error ? e.message : e));
+    } else {
+      console.log('[외부 AI API 연동] .env.ai-context-tracker에 OPENAI_API_KEY가 없거나 placeholder라 테스트를 건너뜁니다.');
+    }
 
     console.log('[Phase 1] 1단계: Hover Provider 등록 (모든 확장자)...');
     const hoverProvider = new AIContextHoverProvider(metadataStore);
@@ -283,6 +308,23 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
             if (msg.type === 'copy' && typeof msg.text === 'string') {
               await vscode.env.clipboard.writeText(msg.text);
               vscode.window.showInformationMessage('클립보드에 복사했습니다.');
+              return;
+            }
+            if (msg.type === 'AI' && typeof msg.text === 'string') {
+              loadEnv(root);
+              const apiKey = getApiKey('OPENAI_API_KEY');
+              if (!apiKey || apiKey.includes('your-key-here')) {
+                console.warn('[외부 AI API 연동] .env.ai-context-tracker에 OPENAI_API_KEY를 설정하세요.');
+                return;
+              }
+              const result = await callAIForContextText(apiKey, msg.text, {
+              prompt: '프롬프트 내용을 한 문장으로 요약해줘.',
+            });
+              if (result.ok) {
+                console.log('[외부 AI API 연동] 응답:', result.text);
+              } else {
+                console.warn('[외부 AI API 연동] 호출 실패:', result.error);
+              }
             }
           });
           return;
@@ -311,6 +353,23 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
           if (msg.type === 'copy' && typeof msg.text === 'string') {
             await vscode.env.clipboard.writeText(msg.text);
             vscode.window.showInformationMessage('클립보드에 복사했습니다.');
+            return;
+          }
+          if (msg.type === 'AI' && typeof msg.text === 'string') {
+            loadEnv(root);
+            const apiKey = getApiKey('OPENAI_API_KEY');
+            if (!apiKey || apiKey.includes('your-key-here')) {
+              console.warn('[외부 AI API 연동] .env.ai-context-tracker에 OPENAI_API_KEY를 설정하세요.');
+              return;
+            }
+            const result = await callAIForContextText(apiKey, msg.text, {
+              prompt: '프롬프트 내용을 한 문장으로 요약해줘.',
+            });
+            if (result.ok) {
+              console.log('[외부 AI API 연동] 응답:', result.text);
+            } else {
+              console.warn('[외부 AI API 연동] 호출 실패:', result.error);
+            }
           }
         });
       }
