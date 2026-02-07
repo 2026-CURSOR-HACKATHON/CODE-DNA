@@ -14,7 +14,29 @@ import * as path from 'path';
 import * as os from 'os';
 import { Composer, Bubble } from './types';
 
-const initSqlJs = require('sql.js');
+/** 모든 로컬 환경에서 sql.js 로드: extensionPath → __dirname → require('sql.js') */
+function loadSqlJs(extensionPath?: string): () => Promise<unknown> {
+  const candidates: string[] = [];
+  if (extensionPath) {
+    candidates.push(path.join(extensionPath, 'node_modules', 'sql.js'));
+  }
+  // 컴파일 결과 out/cursor/cursorDB.js 기준 익스텐션 루트
+  candidates.push(path.join(__dirname, '..', '..', 'node_modules', 'sql.js'));
+  for (const p of candidates) {
+    try {
+      return require(p) as () => Promise<unknown>;
+    } catch {
+      continue;
+    }
+  }
+  try {
+    return require('sql.js') as () => Promise<unknown>;
+  } catch (e) {
+    throw new Error(
+      `sql.js를 로드할 수 없습니다. npm install을 실행했는지 확인하세요. (${String(e)})`
+    );
+  }
+}
 
 function getCursorUserDir(): string {
   if (process.platform === 'win32') {
@@ -74,6 +96,7 @@ export class CursorDB {
   private dbPath: string;
   private db: any | null = null;
   private workspaceRoot: string | null = null;
+  private extensionPath: string | undefined;
 
   /** DB 연결 여부 확인용 헬퍼 (초기화 누락 방지) */
   private ensureDbOpen(methodName: string): void {
@@ -82,10 +105,11 @@ export class CursorDB {
     }
   }
 
-  constructor(workspaceRoot?: string) {
+  constructor(workspaceRoot?: string, extensionPath?: string) {
     const userDir = getCursorUserDir();
     this.dbPath = path.join(userDir, 'globalStorage', 'state.vscdb');
     this.workspaceRoot = workspaceRoot ?? null;
+    this.extensionPath = extensionPath;
   }
 
   /** ISO 8601 문자열/숫자/기타를 통합해서 timestamp(ms)로 변환 */
@@ -109,10 +133,11 @@ export class CursorDB {
       throw new Error(`Cursor DB not found at: ${this.dbPath}`);
     }
     // DB 파일이 Cursor에 의해 쓰이는 중일 수 있으므로, 짧게 재시도
+    const initSqlJs = loadSqlJs(this.extensionPath);
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const SQL = await initSqlJs();
+        const SQL = (await initSqlJs()) as { Database: new (buffer: Buffer) => unknown };
         const buffer = fs.readFileSync(this.dbPath);
         this.db = new SQL.Database(buffer);
         console.log(`[CursorDB] DB 초기화 성공: ${this.dbPath} (시도 ${attempt}회차)`);
@@ -193,16 +218,17 @@ export class CursorDB {
     if (!wsPath || !fs.existsSync(wsPath)) return [];
 
     // 워크스페이스 DB는 별도 연결로 읽고 즉시 닫는다
-    const SQL = await initSqlJs();
+    const initSqlJs = loadSqlJs(this.extensionPath);
+    const SQL = (await initSqlJs()) as { Database: new (buffer: Buffer) => { exec: (sql: string) => unknown[]; close: () => void } };
     const buffer = fs.readFileSync(wsPath);
-    const wsDb = new SQL.Database(buffer);
+    const wsDb = new SQL.Database(buffer) as { exec: (sql: string) => unknown[]; close: () => void };
 
     try {
       let composerIds: string[] = [];
       try {
         const tableResult = wsDb.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='ItemTable'");
         if (tableResult.length === 0) return [];
-        const rowResult = wsDb.exec("SELECT value FROM ItemTable WHERE key = 'composer.composerData'");
+        const rowResult = wsDb.exec("SELECT value FROM ItemTable WHERE key = 'composer.composerData'") as { values: unknown[][] }[];
         if (rowResult.length === 0 || rowResult[0].values.length === 0) return [];
         const value = rowResult[0].values[0][0];
         if (typeof value !== 'string') return [];

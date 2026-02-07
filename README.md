@@ -129,8 +129,8 @@ class AIContextHoverProvider implements vscode.HoverProvider {
 
 - [ ] AI 응답 자동 감지 (5초 폴링)
 - [ ] 파일 변경 추적 (FileSystemWatcher)
-- [ ] Git 자동 커밋 (ai-context-{username} 브랜치)
-- [ ] 라인 범위 추적 (Git diff 파싱)
+- [x] Git 자동 커밋 (ai-context-{username} 브랜치)
+- [x] 라인 범위 추적 (Git diff 파싱)
 - [ ] 실제 메타데이터 저장 (.ai-context/)
 
 ## 📝 라이선스
