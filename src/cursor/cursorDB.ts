@@ -346,12 +346,35 @@ export class CursorDB {
           const data = JSON.parse(value) as Record<string, unknown>;
           const bubbleId = key.split(':')[2];
           const text = CursorDB.extractBubbleText(data);
+          
+          // 추가 필드 파싱
+          const modelInfo = data.modelInfo as { modelName?: string } | undefined;
+          const context = data.context as any;
+          const tokenCount = data.tokenCount as { inputTokens?: number; outputTokens?: number } | undefined;
+          const thinking = data.thinking as { text?: string } | undefined;
+          const externalLinks = data.externalLinks as Array<any> | undefined;
+          const relevantFiles = data.relevantFiles as string[] | undefined;
+          const attachedCodeChunks = data.attachedCodeChunks as Array<any> | undefined;
+          
           bubbles.push({
             bubbleId,
             composerId,
             type: data.type === 1 ? 'user' : data.type === 2 ? 'assistant' : 'user',
             text,
             createdAt: CursorDB.normalizeTimestamp((data as { createdAt?: unknown }).createdAt, `bubble:${bubbleId}.createdAt`),
+            modelInfo,
+            context: context ? {
+              selections: context.selections,
+              fileSelections: context.fileSelections
+            } : undefined,
+            tokenCount: tokenCount ? {
+              inputTokens: tokenCount.inputTokens || 0,
+              outputTokens: tokenCount.outputTokens || 0
+            } : undefined,
+            thinking,
+            externalLinks,
+            relevantFiles,
+            attachedCodeChunks
           });
         } catch (parseError) {
           console.error(`[CursorDB] bubble JSON 파싱 실패: ${key}`, parseError);

@@ -63,12 +63,22 @@ export async function saveMetadataFromCursorDB(
   const timestampMs = now.getTime();
   const timestampStr = now.toISOString().slice(0, 19).replace('T', ' ');
 
+  // 새로운 형식으로 변환
+  const filesChanged = effectiveFiles.map(f => f.filePath);
+  const lineRanges: Record<string, [number, number][]> = {};
+  effectiveFiles.forEach(f => {
+    lineRanges[f.filePath] = f.lineRanges.map(r => [r.start, r.end]);
+  });
+  
   const entry: AICodeMetadata = {
     bubbleId,
     composerId,
     prompt: prompt || '(프롬프트 없음)',
     thinking: thinking || '(응답 없음)',
+    aiResponse: thinking || '(응답 없음)',
     files: effectiveFiles,
+    filesChanged,
+    lineRanges,
     commitHash,
     timestamp: timestampMs,
     timestampStr,

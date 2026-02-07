@@ -11,8 +11,21 @@ export interface Bubble {
   type: 'user' | 'assistant';
   text: string;
   createdAt: number;
-  modelType?: string;
-  selections?: { text: string; file?: string }[];
+  modelInfo?: { modelName?: string };
+  context?: {
+    selections?: { text: string; file?: string; startLine?: number; endLine?: number }[];
+    fileSelections?: { relativePath: string }[];
+  };
+  tokenCount?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+  thinking?: {
+    text?: string;
+  };
+  externalLinks?: Array<{ url: string; title?: string }>;
+  relevantFiles?: string[];
+  attachedCodeChunks?: Array<{ relativePath: string }>;
 }
 
 /** .ai-context 내 context JSON 한 개 (commitHash/contextId 기반 파일) */
@@ -30,22 +43,48 @@ export interface AiContextEntry {
 
 /** 기능 1-6: .ai-context/metadata.json 한 항목 (프롬프트-코드 연결) */
 export interface AICodeMetadata {
+  // IDs
   bubbleId: string;
   composerId: string;
+  
+  // Git 정보
+  commitHash?: string;
+  beforeCommitHash?: string;
+  
+  // Cursor 정보
   prompt: string;
   thinking?: string;
-  /** 여러 파일 + 라인 범위 (by file, by line 검색용). 없으면 filePath+lineRanges 사용 */
-  files?: { filePath: string; lineRanges: { start: number; end: number }[] }[];
-  commitHash?: string;
-  /** 메타데이터 저장 시각 (ms) */
-  timestamp: number;
-  /** 사람이 읽기 좋은 시각 문자열 (YYYY-MM-DD HH:MM:SS) */
-  timestampStr?: string;
-  tokens?: number;
-  /** 하위 호환: 단일 파일 시 filePath */
-  filePath?: string;
-  lineRanges?: { start: number; end: number }[];
   aiResponse?: string;
+  timestamp: number;
+  timestampStr?: string;
   modelType?: string;
-  userSelections?: { text: string; file?: string }[];
+  
+  // 파일 정보
+  filesChanged?: string[];
+  lineRanges?: Record<string, [number, number][]> | { start: number; end: number }[];
+  
+  // 사용자 컨텍스트
+  userSelections?: {
+    text: string;
+    file?: string;
+    startLine?: number;
+    endLine?: number;
+  }[];
+  
+  // 추가 컨텍스트
+  relatedFiles?: string[];
+  externalLinks?: Array<{ url: string; title?: string }>;
+  costInCents?: number;
+  tokenCount?: {
+    input: number;
+    output: number;
+  };
+  
+  // 하위 호환 (deprecated)
+  /** @deprecated Use filesChanged instead */
+  files?: { filePath: string; lineRanges: { start: number; end: number }[] }[];
+  /** @deprecated Use filesChanged[0] instead */
+  filePath?: string;
+  /** @deprecated Use tokenCount instead */
+  tokens?: number;
 }

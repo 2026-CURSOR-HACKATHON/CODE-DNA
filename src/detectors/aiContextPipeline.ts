@@ -6,6 +6,8 @@ import { FileChangeTracker, AFTER_WINDOW_MS } from './fileChangeTracker';
 import { getDiffLineRanges, lineRangesByFileToFilesArray } from '../utils/gitDiff';
 import { ensureAiContextBranch, commitMatchedFiles, restoreBranch, getAiContextBranchName } from '../utils/gitCommit';
 import { saveMetadataFromCursorDB } from '../store/saveMetadataFromCursor';
+import { UserAssistantPair } from './bubblePairDetector';
+import { enrichPairWithFiles, EnrichedUserAssistantPair } from './pairEnricher';
 
 export interface AiContextPipelineOptions {
   /** ai-context 브랜치를 이번에 새로 만든 경우 한 번 호출 (기능 1-4: 사용자 알림용) */
@@ -83,7 +85,6 @@ export async function runAiContextPipeline(
     commitHash = await commitMatchedFiles(workspaceRoot, filePaths);
   } catch (gitErr) {
     console.warn('[AiContextPipeline] Git 처리 단계 실패 → 커밋 없이 메타데이터만 저장:', gitErr instanceof Error ? gitErr.message : gitErr);
-    // FileChangeTracker로 찾은 파일은 반드시 메타데이터에 저장 (상위 Fallback "(현재 파일 없음)" 방지)
     const filesForMeta = lineRangesByFileToFilesArray(lineRangesByFile);
     await saveMetadataFromCursorDB(cursorDB, metadataStore, {
       composerId: bubble.composerId,
@@ -124,4 +125,166 @@ export async function runAiContextPipeline(
     );
   }
   return true;
+}
+
+/**
+ * USER-ASSISTANT 페어 기반 파이프라인
+ * - 페어링된 대화 단위로 처리
+ * - 파일 변경 연결 → Git 커밋 → 메타데이터 저장
+ */
+export async function runAiContextPipelineForPair(
+  workspaceRoot: string,
+  cursorDB: CursorDB,
+  metadataStore: MetadataStore,
+  fileChangeTracker: FileChangeTracker,
+  pair: UserAssistantPair,
+  options?: AiContextPipelineOptions
+): Promise<boolean> {
+  console.log(
+    `[AiContextPipeline-Pair] 페어 처리 시작: USER="${pair.userBubble.text.substring(0, 50)}..."`
+  );
+  
+  const enrichedPair = await enrichPairWithFiles(pair, fileChangeTracker, workspaceRoot);
+  
+  if (enrichedPair.changedFiles.length === 0) {
+    console.log('[AiContextPipeline-Pair] 변경된 파일 없음 → Fallback: 현재 열린 파일 사용');
+    
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+      if (!relativePath.startsWith('.ai-context')) {
+        const sel = editor.selection;
+        enrichedPair.changedFiles = [{
+          filePath: relativePath,
+          lineRanges: [{ start: sel.start.line + 1, end: sel.end.line + 1 }]
+        }];
+      }
+    }
+    
+    if (enrichedPair.changedFiles.length === 0) {
+      enrichedPair.changedFiles = [{
+        filePath: '(파일 변경 없음)',
+        lineRanges: [{ start: 1, end: 1 }]
+      }];
+    }
+  }
+  
+  let commitHash: string | null = null;
+  
+  if (enrichedPair.changedFiles.some(f => f.filePath !== '(파일 변경 없음)')) {
+    try {
+      const filePaths = enrichedPair.changedFiles.map(f => f.filePath);
+      const { branchName, created } = await ensureAiContextBranch(workspaceRoot);
+      
+      if (created && options?.onAiContextBranchFirstCreated) {
+        options.onAiContextBranchFirstCreated(branchName);
+      }
+      
+      commitHash = await commitMatchedFiles(workspaceRoot, filePaths);
+      console.log(`[AiContextPipeline-Pair] Git 커밋 완료: ${commitHash?.substring(0, 7)}`);
+    } catch (gitErr) {
+      console.warn('[AiContextPipeline-Pair] Git 처리 실패:', gitErr instanceof Error ? gitErr.message : gitErr);
+    } finally {
+      try {
+        await restoreBranch(workspaceRoot);
+      } catch (e) {
+        console.warn('[AiContextPipeline-Pair] 브랜치 복구 실패:', e instanceof Error ? e.message : e);
+      }
+    }
+  }
+  
+  await saveEnrichedPairMetadata(cursorDB, metadataStore, enrichedPair, commitHash ?? undefined, workspaceRoot);
+  
+  console.log(
+    `[AiContextPipeline-Pair] ✅ 완료: ${enrichedPair.changedFiles.length}개 파일, commitHash=${commitHash?.substring(0, 7) || 'none'}`
+  );
+  
+  return true;
+}
+
+async function saveEnrichedPairMetadata(
+  cursorDB: CursorDB,
+  metadataStore: MetadataStore,
+  enrichedPair: EnrichedUserAssistantPair,
+  commitHash?: string,
+  workspaceRoot?: string
+): Promise<void> {
+  const { changedFiles, userBubble, assistantBubbles } = enrichedPair;
+  
+  // 실제 코드 파일 정보가 없으면 저장하지 않음
+  const effectiveFiles = changedFiles.filter(
+    f => f.filePath && 
+         f.filePath !== '(현재 파일 없음)' && 
+         f.filePath !== '(파일 변경 없음)' && 
+         !f.filePath.startsWith('.ai-context/')
+  );
+  
+  if (effectiveFiles.length === 0) {
+    console.log('[saveEnrichedPairMetadata] 유효한 파일 변경이 없어 메타데이터를 저장하지 않습니다.');
+    return;
+  }
+  
+  // beforeCommitHash 추출
+  let beforeCommitHash: string | undefined;
+  if (commitHash && workspaceRoot) {
+    try {
+      const git = (await import('simple-git')).default(workspaceRoot);
+      const log = await git.log({ maxCount: 2 });
+      if (log.all.length >= 2) {
+        beforeCommitHash = log.all[1].hash;
+      }
+    } catch (e) {
+      console.warn('[saveEnrichedPairMetadata] beforeCommitHash 추출 실패:', e);
+    }
+  }
+  
+  // 새로운 AICodeMetadata 형식으로 변환
+  const filesChanged = effectiveFiles.map(f => f.filePath);
+  const lineRanges: Record<string, [number, number][]> = {};
+  
+  effectiveFiles.forEach(f => {
+    lineRanges[f.filePath] = f.lineRanges.map(r => [r.start, r.end]);
+  });
+  
+  const thinking = assistantBubbles
+    .filter(b => b.thinking?.text)
+    .map(b => b.thinking!.text!)
+    .join('\n\n---\n\n');
+  
+  const aiResponse = assistantBubbles
+    .map(b => b.text)
+    .filter(t => t.trim().length > 0)
+    .join('\n\n---\n\n');
+  
+  const now = new Date();
+  const timestampMs = now.getTime();
+  const timestampStr = now.toISOString().slice(0, 19).replace('T', ' ');
+  
+  const metadata: import('../cursor/types').AICodeMetadata = {
+    bubbleId: userBubble.bubbleId,
+    composerId: userBubble.composerId,
+    commitHash,
+    beforeCommitHash,
+    prompt: userBubble.text || '(프롬프트 없음)',
+    thinking: thinking || undefined,
+    aiResponse: aiResponse || '(응답 없음)',
+    timestamp: timestampMs,
+    timestampStr,
+    modelType: enrichedPair.modelType,
+    filesChanged,
+    lineRanges,
+    userSelections: enrichedPair.userSelections,
+    relatedFiles: enrichedPair.relatedFiles,
+    externalLinks: enrichedPair.externalLinks,
+    tokenCount: enrichedPair.tokenCount,
+    // 하위 호환성을 위한 기존 형식도 유지
+    files: effectiveFiles,
+  };
+  
+  console.log('[saveEnrichedPairMetadata] 새로운 형식으로 메타데이터 저장');
+  console.log(`  - 파일: ${filesChanged.length}개`);
+  console.log(`  - 모델: ${metadata.modelType || '미지정'}`);
+  console.log(`  - 토큰: ${metadata.tokenCount ? `${metadata.tokenCount.input}/${metadata.tokenCount.output}` : '미지정'}`);
+  
+  metadataStore.upsertMetadata(metadata);
 }

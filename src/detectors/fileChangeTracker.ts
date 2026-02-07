@@ -101,4 +101,25 @@ export class FileChangeTracker {
     // #endregion
     return result;
   }
+
+  /**
+   * startTime ~ endTime 사이 변경된 파일 경로 목록 (중복 제거)
+   * - USER-ASSISTANT 페어의 시간 범위 내 변경 파일 조회용
+   */
+  getFilePathsBetween(startTime: number, endTime: number): string[] {
+    this.pruneOld();
+    const set = new Set<string>();
+    
+    for (const event of this.events) {
+      if (event.timestamp >= startTime && event.timestamp <= endTime) {
+        set.add(event.filePath);
+      }
+    }
+    
+    const result = Array.from(set);
+    console.log(
+      `[FileChangeTracker] getFilePathsBetween: ${new Date(startTime).toLocaleTimeString()} ~ ${new Date(endTime).toLocaleTimeString()} → ${result.length}개 파일`
+    );
+    return result;
+  }
 }

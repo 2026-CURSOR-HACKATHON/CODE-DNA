@@ -133,11 +133,11 @@ export class MetadataStore {
           : entry.thinking ?? existing.thinking;
 
       // files: 기존 + 새 files 병합. 같은 filePath는 한 번만 유지 (중복 추가 금지)
-      const existingFiles =
+      const existingFiles: { filePath: string; lineRanges: { start: number; end: number }[] }[] =
         existing.files?.length
           ? existing.files
-          : existing.filePath && existing.lineRanges
-            ? [{ filePath: existing.filePath, lineRanges: existing.lineRanges }]
+          : existing.filePath && existing.lineRanges && Array.isArray(existing.lineRanges)
+            ? [{ filePath: existing.filePath, lineRanges: existing.lineRanges as { start: number; end: number }[] }]
             : [];
       const existingPaths = new Set(
         existingFiles.map((f) => f.filePath).filter(Boolean)
@@ -154,7 +154,7 @@ export class MetadataStore {
         ...existing,
         ...entry,
         thinking: mergedThinking,
-        files: mergedFiles,
+        files: mergedFiles as any,
       };
     }
 
@@ -188,12 +188,40 @@ export class MetadataStore {
   getMetadataByFileAndLine(filePath: string, lineNumber: number): AICodeMetadata[] {
     const list = this.readMetadata();
     return list.filter((entry) => {
-      const files = entry.files?.length ? entry.files : entry.filePath && entry.lineRanges ? [{ filePath: entry.filePath, lineRanges: entry.lineRanges }] : [];
-      return files.some(
-        (f) =>
-          this.sameFile(f.filePath, filePath) &&
-          f.lineRanges.some((r) => lineNumber >= r.start && lineNumber <= r.end)
-      );
+      // 기존 형식 files 배열 확인
+      const files = entry.files?.length 
+        ? entry.files 
+        : entry.filePath && entry.lineRanges && Array.isArray(entry.lineRanges)
+        ? [{ filePath: entry.filePath, lineRanges: entry.lineRanges }] 
+        : [];
+      
+      const hasMatchInFiles = files.some((f) => {
+        if (!this.sameFile(f.filePath, filePath)) return false;
+        const ranges = f.lineRanges;
+        if (!Array.isArray(ranges)) return false;
+        return ranges.some((r: any) => {
+          if (typeof r === 'object' && 'start' in r && 'end' in r) {
+            return lineNumber >= r.start && lineNumber <= r.end;
+          } else if (Array.isArray(r) && r.length === 2) {
+            return lineNumber >= r[0] && lineNumber <= r[1];
+          }
+          return false;
+        });
+      });
+      
+      if (hasMatchInFiles) return true;
+      
+      // 새로운 형식 lineRanges Record 확인
+      if (entry.lineRanges && typeof entry.lineRanges === 'object' && !Array.isArray(entry.lineRanges)) {
+        const ranges = entry.lineRanges[filePath];
+        if (ranges && Array.isArray(ranges)) {
+          return ranges.some((r: [number, number]) => 
+            lineNumber >= r[0] && lineNumber <= r[1]
+          );
+        }
+      }
+      
+      return false;
     });
   }
 
