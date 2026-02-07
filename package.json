@@ -20,7 +20,7 @@
         {
           "id": "codeDNA",
           "title": "CODE-DNA",
-          "icon": "$(dna)"
+          "icon": "sidebar.svg"
         }
       ]
     },
