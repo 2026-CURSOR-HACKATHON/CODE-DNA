@@ -1139,7 +1139,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       <div class="contexts-split">
         <div class="contexts-panel">
           <div class="contexts-panel-header" id="recent-contexts-header">
-            <span>📋 Recent Contexts</span>
+            <span>Recent Contexts</span>
             <div style="display: flex; align-items: center; gap: 8px;">
               <span id="context-count" style="font-size: 11px; opacity: 0.7;">0</span>
               <span class="toggle-icon" id="toggle-icon">▼</span>
@@ -1154,8 +1154,8 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
         
         <div class="contexts-panel" style="flex: 1;">
           <div class="contexts-panel-header">
-            <span>⏱️ Timeline by Chat</span>
-            <button class="graph-btn" onclick="testRender()" style="background: var(--vscode-button-secondaryBackground); border: 1px solid var(--vscode-panel-border); margin: 0;">🔍 Debug</button>
+            <span>Timeline by Chat</span>
+            <button class="graph-btn" onclick="testRender()" style="background: var(--vscode-button-secondaryBackground); border: 1px solid var(--vscode-panel-border); margin: 0;">Debug</button>
           </div>
           <div class="graph-container" id="graph-container">
             <div class="empty-state">Select a view to display timeline</div>
@@ -1179,11 +1179,11 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
   <div id="chat-tab" class="tab-content">
     <div class="chat-container">
       <div id="attached-contexts" class="attached-contexts">
-        <div class="attached-contexts-header">첨부된 컨텍스트:</div>
+        <div class="attached-contexts-header">Attached:</div>
         <div id="attached-tags"></div>
       </div>
       <div class="chat-messages" id="chat-messages">
-        <div class="empty-state">💬 AI와 대화를 시작하세요</div>
+        <div class="empty-state">Start a conversation with AI</div>
       </div>
       <div class="chat-input-container">
         <div class="chat-input-wrapper">
@@ -1441,8 +1441,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
         textInfo.style.opacity = '0.8';
         
         textInfo.innerHTML = \`
-          <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px;">\${ctx.prompt.substring(0, 50)}\${ctx.prompt.length > 50 ? '...' : ''}</span>
-          <span style="font-family: monospace; font-size: 10px; color: var(--vscode-descriptionForeground); flex-shrink: 0;">\${ctx.id.substring(0, 8)}</span>
+          <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; padding-right: 8px;">\${ctx.prompt.substring(0, 100)}\${ctx.prompt.length > 100 ? '...' : ''}</span>
           <span style="font-size: 10px; color: var(--vscode-descriptionForeground); flex-shrink: 0;">\${date}</span>
         \`;
         row.appendChild(textInfo);
@@ -1472,9 +1471,9 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
           </div>
           <div style="font-size: 11px; color: var(--vscode-editorHoverWidget-foreground); margin-bottom: 6px; line-height: 1.4; word-wrap: break-word;">\${ctx.prompt.substring(0, 150)}\${ctx.prompt.length > 150 ? '...' : ''}</div>
           <div style="font-size: 10px; color: var(--vscode-descriptionForeground); display: flex; flex-wrap: wrap; gap: 8px;">
-            <span>📄 \${ctx.files} files</span>
-            <span>🔢 \${ctx.tokens} tokens</span>
-            <span>🕐 \${date}</span>
+            <span>\${ctx.files} files</span>
+            <span>\${ctx.tokens} tokens</span>
+            <span>\${date}</span>
           </div>
         \`;
         
@@ -1560,7 +1559,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       if (!header) {
         header = document.createElement('div');
         header.className = 'attached-contexts-header';
-        header.textContent = '📎';
+        header.textContent = 'Attached:';
         container.insertBefore(header, tagsContainer);
       }
       
@@ -1593,20 +1592,20 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       contentDiv.innerHTML = \`
         <div class="fullcontext-header" style="position: relative;">
           <div class="header-left">
-            <h1>🧬 AI Context</h1>
+            <h1>AI Context Details</h1>
             <span class="id-badge">\${data.id.substring(0, 8)}</span>
           </div>
           <div class="header-meta">
-            <span>🕐 \${date}</span>
-            <span>📄 \${data.files.length} files</span>
-            <span>🔢 \${data.files.reduce((sum, f) => sum + f.lineRanges.length, 0)} ranges</span>
+            <span>\${date}</span>
+            <span>\${data.files.length} files</span>
+            <span>\${data.files.reduce((sum, f) => sum + f.lineRanges.length, 0)} ranges</span>
           </div>
         </div>
 
         <div class="fullcontext-section">
           <div class="section-header">
-            <span class="section-title">💬 Prompt</span>
-            <button class="copy-btn" data-copy-type="prompt">📋 Copy</button>
+            <span class="section-title">Prompt</span>
+            <button class="copy-btn" data-copy-type="prompt">Copy</button>
           </div>
           <div class="section-body">
             <div class="markdown-content">\${promptRendered}</div>
@@ -1615,8 +1614,8 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
 
         <div class="fullcontext-section">
           <div class="section-header">
-            <span class="section-title">✨ AI Response</span>
-            <button class="copy-btn" data-copy-type="thinking">📋 Copy</button>
+            <span class="section-title">AI Response</span>
+            <button class="copy-btn" data-copy-type="thinking">Copy</button>
           </div>
           <div class="section-body">
             <div class="markdown-content">\${thinkingRendered}</div>
@@ -1625,14 +1624,14 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
 
         <div class="fullcontext-section">
           <div class="section-header">
-            <span class="section-title">📁 Files & Ranges</span>
+            <span class="section-title">Files & Ranges</span>
           </div>
           <div class="section-body">
             \${data.files.length > 0 ? \`
               <div class="file-list">
                 \${data.files.map((f, idx) => \`
                   <div class="file-item" data-file-index="\${idx}">
-                    <div class="file-path" title="\${f.filePath}">📄 \${f.filePath}</div>
+                    <div class="file-path" title="\${f.filePath}">\${f.filePath}</div>
                     <div class="file-ranges">\${f.lineRanges.map(r => \`\${r.start}-\${r.end}\`).join(', ')}</div>
                   </div>
                 \`).join('')}
@@ -1758,7 +1757,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       
       const avatar = document.createElement('div');
       avatar.className = 'message-avatar';
-      avatar.textContent = role === 'user' ? '👤' : '🤖';
+      avatar.textContent = role === 'user' ? 'U' : 'AI';
       
       const name = document.createElement('span');
       name.textContent = role === 'user' ? 'You' : 'AI Assistant';
@@ -1905,7 +1904,7 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
           if (lastErrMsg && lastErrMsg.textContent === '답변 생성 중...') {
             lastErrMsg.remove();
           }
-          addMessage('assistant', '❌ Error: ' + message.error);
+          addMessage('assistant', 'Error: ' + message.error);
           sendBtn.disabled = false;
           break;
       }
