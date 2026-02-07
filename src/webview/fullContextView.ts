@@ -20,10 +20,49 @@ export interface FullContextData {
   timestampStr?: string;
 }
 
+/** 간단한 마크다운 → HTML 변환 */
+function renderMarkdown(md: string): string {
+  if (!md) return '<p>(없음)</p>';
+  
+  let html = md;
+  
+  // 코드 블록 (```)
+  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+    const langLabel = lang ? ` class="language-${escapeHtml(lang)}"` : '';
+    return `<pre${langLabel}><code>${escapeHtml(code.trim())}</code></pre>`;
+  });
+  
+  // 인라인 코드 (`)
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  
+  // 볼드 (**)
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  
+  // 이탤릭 (*)
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  
+  // 링크 [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+  
+  // 헤딩
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  
+  // 리스트
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+  
+  // 줄바꿈을 <br>로 (리스트/헤딩/코드블록 제외)
+  html = html.replace(/\n(?!<[uh]|<pre|<li)/g, '<br>');
+  
+  return html;
+}
+
 export function getFullContextWebviewContent(data: FullContextData): string {
   const timeStr = data.timestampStr ?? new Date(data.timestamp).toLocaleString('ko-KR');
-  const promptEsc = escapeAttr(data.prompt || '(없음)');
-  const thinkingEsc = escapeAttr(data.thinking || '(없음)');
+  const promptRendered = renderMarkdown(data.prompt || '(없음)');
+  const thinkingRendered = renderMarkdown(data.thinking || '(없음)');
   const fileList = data.files?.length
     ? data.files.map((f) => `${f.filePath} (${f.lineRanges.map((r) => `${r.start}-${r.end}`).join(', ')})`).join('\n')
     : '(없음)';
@@ -124,30 +163,105 @@ export function getFullContextWebviewContent(data: FullContextData): string {
       border-radius: 0 0 6px 6px;
       background: var(--vscode-editor-background);
     }
-    .code-block {
-      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-      font-size: 12px;
+    .markdown-content {
+      font-size: 13px;
       line-height: 1.6;
       padding: 12px;
-      white-space: pre-wrap;
-      word-break: break-word;
-      max-height: 300px;
+      max-height: 500px;
       overflow-y: auto;
       margin: 0;
     }
-    .code-block::-webkit-scrollbar {
+    .markdown-content::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
-    .code-block::-webkit-scrollbar-track {
+    .markdown-content::-webkit-scrollbar-track {
       background: transparent;
     }
-    .code-block::-webkit-scrollbar-thumb {
+    .markdown-content::-webkit-scrollbar-thumb {
       background: var(--vscode-scrollbarSlider-background);
       border-radius: 3px;
     }
-    .code-block::-webkit-scrollbar-thumb:hover {
+    .markdown-content::-webkit-scrollbar-thumb:hover {
       background: var(--vscode-scrollbarSlider-hoverBackground);
+    }
+    .markdown-content h1,
+    .markdown-content h2,
+    .markdown-content h3 {
+      margin: 16px 0 8px 0;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .markdown-content h1:first-child,
+    .markdown-content h2:first-child,
+    .markdown-content h3:first-child {
+      margin-top: 0;
+    }
+    .markdown-content h1 {
+      font-size: 18px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      padding-bottom: 6px;
+    }
+    .markdown-content h2 {
+      font-size: 16px;
+    }
+    .markdown-content h3 {
+      font-size: 14px;
+    }
+    .markdown-content p {
+      margin: 8px 0;
+    }
+    .markdown-content code {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: var(--vscode-textCodeBlock-background);
+      border: 1px solid var(--vscode-panel-border);
+    }
+    .markdown-content pre {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 12px;
+      margin: 12px 0;
+      border-radius: 6px;
+      background: var(--vscode-textCodeBlock-background);
+      border: 1px solid var(--vscode-panel-border);
+      overflow-x: auto;
+    }
+    .markdown-content pre code {
+      padding: 0;
+      border: none;
+      background: transparent;
+    }
+    .markdown-content ul,
+    .markdown-content ol {
+      margin: 8px 0;
+      padding-left: 24px;
+    }
+    .markdown-content li {
+      margin: 4px 0;
+    }
+    .markdown-content a {
+      color: var(--vscode-textLink-foreground);
+      text-decoration: none;
+    }
+    .markdown-content a:hover {
+      text-decoration: underline;
+    }
+    .markdown-content strong {
+      font-weight: 600;
+    }
+    .markdown-content em {
+      font-style: italic;
+    }
+    .markdown-content blockquote {
+      margin: 12px 0;
+      padding: 8px 12px;
+      border-left: 4px solid var(--vscode-panel-border);
+      background: var(--vscode-textBlockQuote-background);
+      color: var(--vscode-descriptionForeground);
     }
     .file-list {
       margin: 0;
@@ -245,7 +359,7 @@ export function getFullContextWebviewContent(data: FullContextData): string {
         <button data-action="copy" data-target="prompt">Copy</button>
       </div>
       <div class="section-body">
-        <pre class="code-block">${promptEsc.replace(/&#10;/g, '\n')}</pre>
+        <div class="markdown-content">${promptRendered}</div>
       </div>
     </div>
 
@@ -255,7 +369,7 @@ export function getFullContextWebviewContent(data: FullContextData): string {
         <button data-action="copy" data-target="thinking">Copy</button>
       </div>
       <div class="section-body">
-        <pre class="code-block">${thinkingEsc.replace(/&#10;/g, '\n')}</pre>
+        <div class="markdown-content">${thinkingRendered}</div>
       </div>
     </div>
 
@@ -279,7 +393,6 @@ export function getFullContextWebviewContent(data: FullContextData): string {
 
     <div class="actions" style="margin-top: 16px;">
       <button class="primary" data-action="copy" data-target="all">Copy All</button>
-      <button class="primary" data-action="AI" data-target="prompt">AI 어쩌고</button>
     </div>
   </div>
 
@@ -298,15 +411,6 @@ export function getFullContextWebviewContent(data: FullContextData): string {
           else if (target === 'thinking') text = thinkingText;
           else if (target === 'all') text = allText;
           if (text && vscode) vscode.postMessage({ type: 'copy', text: text });
-        });
-      });
-
-      document.querySelectorAll('[data-action="AI"]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          const target = btn.getAttribute('data-target');
-          if (target === 'prompt') {
-            vscode.postMessage({ type: 'AI', text: promptText });
-          }
         });
       });
     })();

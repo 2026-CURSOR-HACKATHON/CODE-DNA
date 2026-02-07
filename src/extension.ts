@@ -7,9 +7,11 @@ import { AIResponseDetector } from './detectors/aiResponseDetector';
 import { FileChangeTracker } from './detectors/fileChangeTracker';
 import { runAiContextPipeline } from './detectors/aiContextPipeline';
 import { getFullContextWebviewContent, FullContextData } from './webview/fullContextView';
+import { AIContextDecorator } from './decorations/aiContextDecorator';
 
 let aiResponseDetector: AIResponseDetector | null = null;
 let fileChangeTracker: FileChangeTracker | null = null;
+let aiContextDecorator: AIContextDecorator | null = null;
 let initialized = false;
 let activeBubbleId: string | null = null;
 let activeBubbleStartedAt: number | null = null;
@@ -43,6 +45,16 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
       vscode.languages.registerHoverProvider(hoverSelector, hoverProvider)
     );
     console.log('[Phase 1] ✅ Hover Provider 등록 완료 (모든 파일)');
+
+    console.log('[Phase 1] 1-2단계: AI Context Decorator 시작...');
+    aiContextDecorator = new AIContextDecorator(metadataStore);
+    context.subscriptions.push({
+      dispose: () => {
+        aiContextDecorator?.dispose();
+        aiContextDecorator = null;
+      },
+    });
+    console.log('[Phase 1] ✅ AI Context Decorator 시작 완료');
 
     console.log('[Phase 1] 2단계: File Change Tracker 시작 (기능 1-3)...');
     fileChangeTracker = new FileChangeTracker(workspaceRoot);
@@ -114,6 +126,10 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
                   label,
                   '파이프라인 성공 → Git 커밋 + metadata 저장 완료 (다른 파일 감지 시 계속 추가)'
                 );
+                // 데코레이션 업데이트
+                if (aiContextDecorator) {
+                  aiContextDecorator.refresh();
+                }
                 // 성공해도 30초 반복은 유지 → 다른 파일이 감지되면 계속 추가
                 return;
               }
@@ -158,6 +174,10 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
               'metadata.json Fallback 저장 완료: bubble=',
               bubble.bubbleId.substring(0, 8)
             );
+            // 데코레이션 업데이트
+            if (aiContextDecorator) {
+              aiContextDecorator.refresh();
+            }
           } catch (e) {
             console.error(
               '[AI Context Tracker]',
@@ -481,5 +501,9 @@ export function deactivate() {
   if (aiResponseDetector) {
     aiResponseDetector.stopPolling();
     aiResponseDetector = null;
+  }
+  if (aiContextDecorator) {
+    aiContextDecorator.dispose();
+    aiContextDecorator = null;
   }
 }
