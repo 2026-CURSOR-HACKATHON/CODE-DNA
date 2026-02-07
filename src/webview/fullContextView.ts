@@ -278,10 +278,13 @@ export function getFullContextWebviewContent(data: FullContextData): string {
       border: 1px solid var(--vscode-panel-border);
       font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
       font-size: 11px;
-      transition: background 0.1s ease;
+      transition: all 0.15s ease;
+      cursor: pointer;
     }
     .file-item:hover {
       background: var(--vscode-list-hoverBackground);
+      border-color: var(--vscode-focusBorder);
+      transform: translateX(2px);
     }
     .file-item:last-child {
       margin-bottom: 0;
@@ -380,8 +383,8 @@ export function getFullContextWebviewContent(data: FullContextData): string {
       <div class="section-body">
         ${data.files?.length ? `
         <div class="file-list">
-          ${data.files.map((f) => `
-            <div class="file-item">
+          ${data.files.map((f, idx) => `
+            <div class="file-item" data-file-index="${idx}">
               <div class="file-path">${escapeHtml(f.filePath)}</div>
               <div class="file-ranges">${f.lineRanges.map((r) => `${r.start}-${r.end}`).join(', ')}</div>
             </div>
@@ -404,6 +407,7 @@ export function getFullContextWebviewContent(data: FullContextData): string {
       const promptText = ${JSON.stringify(data.prompt || '(없음)')};
       const thinkingText = ${JSON.stringify(data.thinking || '(없음)')};
       const allText = '[Prompt]\\n' + promptText + '\\n\\n[AI Thinking]\\n' + thinkingText;
+      const filesData = ${JSON.stringify(data.files || [])};
 
       document.querySelectorAll('[data-action="copy"]').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -424,6 +428,21 @@ export function getFullContextWebviewContent(data: FullContextData): string {
               contextId: contextId,
               prompt: promptText,
               thinking: thinkingText
+            });
+          }
+        });
+      });
+      
+      // 파일 클릭 시 에디터로 이동
+      document.querySelectorAll('.file-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+          const fileIndex = parseInt(item.getAttribute('data-file-index'));
+          const fileData = filesData[fileIndex];
+          if (fileData && vscode) {
+            vscode.postMessage({
+              type: 'openFile',
+              filePath: fileData.filePath,
+              lineRanges: fileData.lineRanges
             });
           }
         });

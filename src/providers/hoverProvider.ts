@@ -2,8 +2,8 @@ import * as vscode from 'vscode';
 import { MetadataStore } from '../store/metadataStore';
 import { AiContextEntry, AICodeMetadata } from '../cursor/types';
 
-const PROMPT_PREVIEW_LEN = 200;
-const THINKING_PREVIEW_LEN = 150;
+const PROMPT_PREVIEW_LEN = 100;
+const THINKING_PREVIEW_LEN = 80;
 
 /**
  * Hover Tooltip (기능 1-7)
@@ -56,15 +56,24 @@ export class AIContextHoverProvider implements vscode.HoverProvider {
   ): vscode.Hover {
     const markdown = new vscode.MarkdownString();
     markdown.isTrusted = true;
+    markdown.supportHtml = true;
+    markdown.supportThemeIcons = true;
 
     // 최신 항목부터 표시 (timestamp 기준 내림차순)
     const sortedEntries = [...entries].sort((a, b) => b.timestamp - a.timestamp);
 
     for (let i = 0; i < sortedEntries.length; i++) {
       const entry = sortedEntries[i];
-      if (i > 0) markdown.appendMarkdown('\n---\n\n');
+      if (i > 0) markdown.appendMarkdown('\n\n---\n\n');
 
-      // 헤더
+      // 헤더 (아이콘과 함께)
+      const id = (entry.commitHash ?? entry.bubbleId ?? '').substring(0, 8);
+      const isLatest = i === 0;
+      const badge = isLatest ? '$(rocket)' : '$(history)';
+      
+      markdown.appendMarkdown(`### ${badge} AI Context \`${id}\`\n\n`);
+
+      // 메타 정보 - 세로 레이아웃
       const fileCount = entry.files?.length ?? (entry.filePath ? 1 : 0);
       const timeStr = new Date(entry.timestamp).toLocaleString('ko-KR', {
         month: '2-digit',
@@ -72,12 +81,6 @@ export class AIContextHoverProvider implements vscode.HoverProvider {
         hour: '2-digit',
         minute: '2-digit',
       });
-      const id = (entry.commitHash ?? entry.bubbleId ?? '').substring(0, 8);
-      const isLatest = i === 0;
-      
-      markdown.appendMarkdown(`### AI Context \`${id}\`${isLatest ? ' ⚡' : ''}\n\n`);
-      
-      // 메타 정보
       const fileEntry = entry.files?.find((f) => this.sameFileForEntry(f.filePath, filePath))
         ?? (entry.filePath && entry.lineRanges ? { filePath: entry.filePath, lineRanges: entry.lineRanges } : null);
       const lineRangeStr = fileEntry
@@ -87,25 +90,34 @@ export class AIContextHoverProvider implements vscode.HoverProvider {
         : `${lineNumber}`;
       const tokenStr = entry.tokens != null ? String(entry.tokens) : '–';
       
-      markdown.appendMarkdown(`**Time:** ${timeStr} | **Files:** ${fileCount} | **Lines:** ${lineRangeStr} | **Tokens:** ${tokenStr}\n\n`);
+      // 정보 세로 나열
+      markdown.appendMarkdown(`$(clock) **Time** ${timeStr} | `);
+      markdown.appendMarkdown(`$(file) **Files** ${fileCount} | `);
+      markdown.appendMarkdown(`$(symbol-array) **Lines** ${lineRangeStr} | `);
+      markdown.appendMarkdown(`$(symbol-numeric) **Tokens** ${tokenStr} \n\n`);
 
-      // 프롬프트
-      markdown.appendMarkdown(`**PROMPT**\n\n`);
-      markdown.appendMarkdown('```markdown\n');
-      markdown.appendMarkdown(`${this.truncate(entry.prompt, PROMPT_PREVIEW_LEN)}\n`);
-      markdown.appendMarkdown('```\n\n');
+      // 프롬프트 섹션
+      markdown.appendMarkdown(`$(comment-discussion) **PROMPT**\n\n`);
+      markdown.appendCodeblock(
+        this.truncate(entry.prompt, PROMPT_PREVIEW_LEN), 
+        'markdown'
+      );
+      markdown.appendMarkdown('\n');
 
-      // Response
-      markdown.appendMarkdown(`**RESPONSE**\n\n`);
-      markdown.appendMarkdown('```markdown\n');
-      markdown.appendMarkdown(`${this.truncate(entry.thinking ?? '(없음)', THINKING_PREVIEW_LEN)}\n`);
-      markdown.appendMarkdown('```\n\n');
+      // Response 섹션
+      markdown.appendMarkdown(`$(sparkle) **RESPONSE**\n\n`);
+      markdown.appendCodeblock(
+        this.truncate(entry.thinking ?? '(없음)', THINKING_PREVIEW_LEN), 
+        'markdown'
+      );
+      markdown.appendMarkdown('\n');
 
-      // 액션 버튼
+      // 액션 버튼 (아이콘 포함)
       const contextId = entry.commitHash ?? entry.bubbleId;
       const copyCmd = `command:ai-context-tracker.copyContext?${encodeURIComponent(JSON.stringify([contextId]))}`;
-      const fullCmd = `command:ai-context-tracker.showFullContext?${encodeURIComponent(JSON.stringify([contextId]))}`;
-      markdown.appendMarkdown(`[View Full](${fullCmd}) • [Copy](${copyCmd})`);
+      const fullCmd = `command:ai-context-tracker.showFullContextInSidebar?${encodeURIComponent(JSON.stringify([contextId]))}`;
+      const chatCmd = `command:ai-context-tracker.tagContextToChat?${encodeURIComponent(JSON.stringify([contextId]))}`;
+      markdown.appendMarkdown(`$(eye) [View](${fullCmd}) &nbsp;•&nbsp; $(comment) [Chat](${chatCmd}) &nbsp;•&nbsp; $(copy) [Copy](${copyCmd})`);
     }
 
     return new vscode.Hover(markdown);
@@ -130,27 +142,30 @@ export class AIContextHoverProvider implements vscode.HoverProvider {
   ): vscode.Hover {
     const markdown = new vscode.MarkdownString();
     markdown.isTrusted = true;
+    markdown.supportHtml = true;
+    markdown.supportThemeIcons = true;
 
     // 최신 항목부터 표시 (timestamp 기준 내림차순)
     const sortedEntries = [...entries].sort((a, b) => b.timestamp - a.timestamp);
 
     for (let i = 0; i < sortedEntries.length; i++) {
       const entry = sortedEntries[i];
-      if (i > 0) markdown.appendMarkdown('\n---\n\n');
+      if (i > 0) markdown.appendMarkdown('\n\n---\n\n');
 
-      // 헤더
+      // 헤더 (아이콘과 함께)
       const id = (entry.commitHash ?? '').substring(0, 8);
+      const isLatest = i === 0;
+      const badge = isLatest ? '$(rocket)' : '$(history)';
+      
+      markdown.appendMarkdown(`### ${badge} AI Context \`${id}\`\n\n`);
+
+      // 메타 정보 - 세로 레이아웃
       const timeStr = new Date(entry.timestamp).toLocaleString('ko-KR', {
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
       });
-      const isLatest = i === 0;
-      
-      markdown.appendMarkdown(`### AI Context \`${id}\`${isLatest ? ' ⚡' : ''}\n\n`);
-
-      // 메타 정보
       const change = entry.changes.find((c) =>
         c.lineRanges.some((r) => lineNumber >= r.start && lineNumber <= r.end)
       );
@@ -160,19 +175,27 @@ export class AIContextHoverProvider implements vscode.HoverProvider {
           .join(', ')
         : `${lineNumber}`;
       const tokenStr = entry.token != null ? String(entry.token) : '–';
-      markdown.appendMarkdown(`**Time:** ${timeStr} | **Lines:** ${lineRangeStr} | **Tokens:** ${tokenStr}\n\n`);
+      const fileCount = entry.changes.length;
 
-      // Prompt & Response
+      // 정보 세로 나열
+      markdown.appendMarkdown(`$(clock) **Time** ${timeStr}  \n`);
+      markdown.appendMarkdown(`$(file) **Files** ${fileCount}  \n`);
+      markdown.appendMarkdown(`$(symbol-array) **Lines** ${lineRangeStr}  \n`);
+      markdown.appendMarkdown(`$(symbol-numeric) **Tokens** ${tokenStr}\n\n`);
+
+      // Prompt 섹션
       if (entry.prompt) {
-        markdown.appendMarkdown(`**PROMPT**\n\n`);
+        markdown.appendMarkdown(`$(comment-discussion) **PROMPT**\n\n`);
         markdown.appendCodeblock(
           this.truncate(entry.prompt, PROMPT_PREVIEW_LEN), 
           'markdown'
         );
         markdown.appendMarkdown('\n');
       }
+
+      // Response 섹션
       if (entry.thinking) {
-        markdown.appendMarkdown(`**RESPONSE**\n\n`);
+        markdown.appendMarkdown(`$(sparkle) **RESPONSE**\n\n`);
         markdown.appendCodeblock(
           this.truncate(entry.thinking, THINKING_PREVIEW_LEN), 
           'markdown'
@@ -180,10 +203,11 @@ export class AIContextHoverProvider implements vscode.HoverProvider {
         markdown.appendMarkdown('\n');
       }
 
-      // 액션 버튼
+      // 액션 버튼 (아이콘 포함)
       const copyCmd = `command:ai-context-tracker.copyContext?${encodeURIComponent(JSON.stringify([entry.commitHash]))}`;
-      const fullCmd = `command:ai-context-tracker.showFullContext?${encodeURIComponent(JSON.stringify([entry.commitHash]))}`;
-      markdown.appendMarkdown(`[View Full](${fullCmd}) • [Copy](${copyCmd})`);
+      const fullCmd = `command:ai-context-tracker.showFullContextInSidebar?${encodeURIComponent(JSON.stringify([entry.commitHash]))}`;
+      const chatCmd = `command:ai-context-tracker.tagContextToChat?${encodeURIComponent(JSON.stringify([entry.commitHash]))}`;
+      markdown.appendMarkdown(`$(eye) [View](${fullCmd}) &nbsp;•&nbsp; $(comment) [Chat](${chatCmd}) &nbsp;•&nbsp; $(copy) [Copy](${copyCmd})`);
     }
 
     return new vscode.Hover(markdown);

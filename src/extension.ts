@@ -343,6 +343,54 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
               vscode.window.showInformationMessage('Chat에 컨텍스트가 태그되었습니다.');
               return;
             }
+            if (msg.type === 'openFile' && msg.filePath && msg.lineRanges) {
+              // 파일 열기 및 하이라이팅
+              const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+              if (!workspaceRoot) return;
+              
+              const fullPath = vscode.Uri.file(
+                msg.filePath.startsWith('/') || msg.filePath.includes(':') 
+                  ? msg.filePath 
+                  : `${workspaceRoot}/${msg.filePath}`
+              );
+              
+              try {
+                const doc = await vscode.workspace.openTextDocument(fullPath);
+                const editor = await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
+                
+                // 하이라이팅할 범위 설정
+                const ranges: vscode.Range[] = msg.lineRanges.map((lr: any) => {
+                  const startLine = Math.max(0, (lr.start || 1) - 1);
+                  const endLine = Math.max(startLine, (lr.end || lr.start || 1) - 1);
+                  return new vscode.Range(startLine, 0, endLine, editor.document.lineAt(endLine).text.length);
+                });
+                
+                // 첫 번째 범위로 스크롤
+                if (ranges.length > 0) {
+                  editor.revealRange(ranges[0], vscode.TextEditorRevealType.InCenter);
+                  editor.selection = new vscode.Selection(ranges[0].start, ranges[0].end);
+                }
+                
+                // 하이라이팅 데코레이션
+                const highlightDecoration = vscode.window.createTextEditorDecorationType({
+                  backgroundColor: new vscode.ThemeColor('editor.findMatchHighlightBackground'),
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: new vscode.ThemeColor('editor.findMatchBorder'),
+                  isWholeLine: true,
+                });
+                
+                editor.setDecorations(highlightDecoration, ranges);
+                
+                // 3초 후 하이라이팅 제거
+                setTimeout(() => {
+                  highlightDecoration.dispose();
+                }, 3000);
+              } catch (e) {
+                vscode.window.showErrorMessage(`파일을 열 수 없습니다: ${msg.filePath}`);
+              }
+              return;
+            }
             if (msg.type === 'AI' && typeof msg.text === 'string') {
               const hasKey = await secretStorage.hasApiKey();
               if (!hasKey) {
@@ -390,6 +438,54 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
           if (msg.type === 'copy' && typeof msg.text === 'string') {
             await vscode.env.clipboard.writeText(msg.text);
             vscode.window.showInformationMessage('클립보드에 복사했습니다.');
+            return;
+          }
+          if (msg.type === 'openFile' && msg.filePath && msg.lineRanges) {
+            // 파일 열기 및 하이라이팅
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            if (!workspaceRoot) return;
+            
+            const fullPath = vscode.Uri.file(
+              msg.filePath.startsWith('/') || msg.filePath.includes(':') 
+                ? msg.filePath 
+                : `${workspaceRoot}/${msg.filePath}`
+            );
+            
+            try {
+              const doc = await vscode.workspace.openTextDocument(fullPath);
+              const editor = await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
+              
+              // 하이라이팅할 범위 설정
+              const ranges: vscode.Range[] = msg.lineRanges.map((lr: any) => {
+                const startLine = Math.max(0, (lr.start || 1) - 1);
+                const endLine = Math.max(startLine, (lr.end || lr.start || 1) - 1);
+                return new vscode.Range(startLine, 0, endLine, editor.document.lineAt(endLine).text.length);
+              });
+              
+              // 첫 번째 범위로 스크롤
+              if (ranges.length > 0) {
+                editor.revealRange(ranges[0], vscode.TextEditorRevealType.InCenter);
+                editor.selection = new vscode.Selection(ranges[0].start, ranges[0].end);
+              }
+              
+              // 하이라이팅 데코레이션
+              const highlightDecoration = vscode.window.createTextEditorDecorationType({
+                backgroundColor: new vscode.ThemeColor('editor.findMatchHighlightBackground'),
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: new vscode.ThemeColor('editor.findMatchBorder'),
+                isWholeLine: true,
+              });
+              
+              editor.setDecorations(highlightDecoration, ranges);
+              
+              // 3초 후 하이라이팅 제거
+              setTimeout(() => {
+                highlightDecoration.dispose();
+              }, 3000);
+            } catch (e) {
+              vscode.window.showErrorMessage(`파일을 열 수 없습니다: ${msg.filePath}`);
+            }
             return;
           }
           if (msg.type === 'AI' && typeof msg.text === 'string') {
@@ -553,7 +649,47 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
       }
     );
 
+    // Sidebar에서 Full Context 보기
+    const showFullContextInSidebarCommand = vscode.commands.registerCommand(
+      'ai-context-tracker.showFullContextInSidebar',
+      async (idArg: string | unknown) => {
+        const id = typeof idArg === 'string' ? idArg : Array.isArray(idArg) ? idArg[0] : undefined;
+        if (!id || typeof id !== 'string') return;
+        
+        // Sidebar 먼저 열기
+        await vscode.commands.executeCommand('workbench.view.extension.codeDNA');
+        
+        // 약간의 딜레이 후 컨텍스트 표시
+        setTimeout(() => {
+          if (sidebarProvider) {
+            sidebarProvider.showContextInSidebar(id);
+          }
+        }, 100);
+      }
+    );
+    
+    // Chat에 컨텍스트 태그
+    const tagContextToChatCommand = vscode.commands.registerCommand(
+      'ai-context-tracker.tagContextToChat',
+      async (idArg: string | unknown) => {
+        const id = typeof idArg === 'string' ? idArg : Array.isArray(idArg) ? idArg[0] : undefined;
+        if (!id || typeof id !== 'string') return;
+        
+        // Sidebar 먼저 열기
+        await vscode.commands.executeCommand('workbench.view.extension.codeDNA');
+        
+        // 약간의 딜레이 후 컨텍스트 태그
+        setTimeout(() => {
+          if (sidebarProvider) {
+            sidebarProvider.tagContextToChat(id);
+          }
+        }, 100);
+      }
+    );
+
     context.subscriptions.push(showFullContextCommand);
+    context.subscriptions.push(showFullContextInSidebarCommand);
+    context.subscriptions.push(tagContextToChatCommand);
     context.subscriptions.push(copyContextCommand);
     context.subscriptions.push(saveMetadataCommand);
     context.subscriptions.push(diagnoseCommand);

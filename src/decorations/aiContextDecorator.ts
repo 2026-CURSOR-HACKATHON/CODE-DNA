@@ -65,6 +65,16 @@ export class AIContextDecorator {
       const contextEntries = this.metadataStore.getContextsForFileAndLine(relativePath, lineNum);
 
       if (metadataEntries.length > 0 || contextEntries.length > 0) {
+        const line = editor.document.lineAt(lineNum - 1);
+        const totalContexts = metadataEntries.length + contextEntries.length;
+        
+        // 컨텍스트 ID 수집
+        const contextIds = [
+          ...metadataEntries.map(m => m.bubbleId?.substring(0, 7) || m.commitHash?.substring(0, 7) || ''),
+          ...contextEntries.map(c => c.commitHash?.substring(0, 7) || '')
+        ].filter(id => id);
+        
+        const displayText = totalContexts > 0 ? ` | AI Context: ${totalContexts}` : '';
         const range = new vscode.Range(
           new vscode.Position(lineNum - 1, 0),
           new vscode.Position(lineNum - 1, 0)
@@ -72,6 +82,14 @@ export class AIContextDecorator {
 
         decorations.push({
           range,
+          renderOptions: {
+            after: {
+              contentText: displayText,
+              color: new vscode.ThemeColor('editorInfo.border'),
+              fontWeight: 'bold',
+              margin: '0 0 0 1em',
+            },
+          },
         });
       }
     }
