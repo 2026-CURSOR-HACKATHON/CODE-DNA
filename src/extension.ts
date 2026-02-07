@@ -14,6 +14,8 @@ let initialized = false;
 let activeBubbleId: string | null = null;
 let activeBubbleStartedAt: number | null = null;
 let activeInterval: NodeJS.Timeout | null = null;
+/** 모든 로컬 환경에서 sql.js 로드용 (activate 시 설정) */
+let extensionPath: string | undefined;
 
 /** 현재 열린 워크스페이스(있다면)에 대해 확장 코어를 초기화 */
 async function initializeForWorkspace(context: vscode.ExtensionContext): Promise<void> {
@@ -52,7 +54,7 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
       },
     });
 
-    const cursorDB = new CursorDB(workspaceRoot);
+    const cursorDB = new CursorDB(workspaceRoot, extensionPath);
 
     console.log('[Phase 1] workspaceRoot =', workspaceRoot);
     console.log('[Phase 1] .ai-context 디렉터리 =', metadataStore.getDirPath(), 'metadata.json =', metadataStore.getMetadataPath());
@@ -335,7 +337,7 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
         const { saveMetadataFromCursorDB } = await import('./store/saveMetadataFromCursor');
         const store = new MetadataStore(root);
         store.ensureDir();
-        const cursorDB = new CursorDB(root);
+        const cursorDB = new CursorDB(root, extensionPath);
         try {
           await cursorDB.initialize();
           const latest = await cursorDB.getLatestAIBubble();
@@ -386,7 +388,7 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
         log(`.ai-context dir: ${dirPath}`);
         log(`metadata.json path: ${metaPath}`);
 
-        const db = new CursorDB(root);
+        const db = new CursorDB(root, extensionPath);
         const globalPath = db.getDbPath();
         const globalExists = require('fs').existsSync(globalPath);
         log(`Cursor global DB: ${globalPath}`);
@@ -455,6 +457,7 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
 }
 
 export async function activate(context: vscode.ExtensionContext) {
+  extensionPath = context.extensionPath;
   console.log('[AI Context Tracker] 확장 활성화 시작...');
 
   // 워크스페이스가 나중에 열리는 경우를 위해 변경 이벤트를 구독
