@@ -4,3 +4,5 @@ out
 *.vsix
 .DS_Store
 .ai-context/
+.env
+.env.ai-context-tracker
