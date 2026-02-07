@@ -18,6 +18,9 @@ export class BubblePairDetector {
   private isProcessing: boolean = false;
   private pollTickCount: number = 0;
   
+  // 페어 완료 대기 시간 (밀리초)
+  private readonly COMPLETION_WAIT_MS = 30000; // 30초
+  
   constructor(
     workspaceRoot: string,
     cursorDB: CursorDB,
@@ -85,13 +88,26 @@ export class BubblePairDetector {
       
       allBubbles.sort((a, b) => a.createdAt - b.createdAt);
       
-      const pairs = this.pairBubbles(allBubbles);
+      if (this.pollTickCount % 6 === 0) {
+        const userCount = allBubbles.filter(b => b.type === 'user').length;
+        const assistantCount = allBubbles.filter(b => b.type === 'assistant').length;
+        const nonEmptyAssistant = allBubbles.filter(b => b.type === 'assistant' && b.text.trim().length > 0).length;
+        console.log(`[BubblePairDetector] 버블 분포: USER=${userCount}, ASSISTANT=${assistantCount} (내용있음=${nonEmptyAssistant})`);
+      }
       
-      const newPairs = pairs.filter(p => !this.cache.has(p.userBubble.bubbleId));
+      const pairs = this.pairBubbles(allBubbles);
+      console.log(`[BubblePairDetector] 페어링 결과: ${pairs.length}개 페어 생성`);
+      
+      // 완료된 페어만 필터링 (마지막 페어는 완료 조건 확인)
+      const completedPairs = this.filterCompletedPairs(pairs, allBubbles);
+      console.log(`[BubblePairDetector] 완료된 페어: ${completedPairs.length}개 (전체 ${pairs.length}개 중)`);
+      
+      const newPairs = completedPairs.filter(p => !this.cache.has(p.userBubble.bubbleId));
+      console.log(`[BubblePairDetector] 새 페어: ${newPairs.length}개 (캐시 크기: ${this.cache.size})`);
       
       if (newPairs.length === 0) {
         if (this.pollTickCount % 6 === 0) {
-          console.log('[BubblePairDetector] 새 페어 없음');
+          console.log('[BubblePairDetector] 새 페어 없음 (모두 처리됨 또는 대기 중)');
         }
         return;
       }
@@ -146,6 +162,7 @@ export class BubblePairDetector {
       }
     }
     
+    // 마지막 페어는 나중에 완료 조건 확인
     if (currentUser) {
       const lastUser = currentUser;
       const filteredAssistants = currentAssistants.filter(b =>
@@ -161,6 +178,71 @@ export class BubblePairDetector {
     }
     
     return pairs;
+  }
+  
+  /**
+   * 페어가 완료되었는지 확인
+   * 완료 조건:
+   * 1. 응답이 하나도 없으면 미완료 (아직 AI가 응답 중일 수 있음)
+   * 2. 마지막 응답 이후 COMPLETION_WAIT_MS 경과
+   * 3. 다음 user bubble이 있으면 완료 (pairBubbles에서 이미 처리됨)
+   */
+  private isPairComplete(pair: UserAssistantPair, isLastPair: boolean): boolean {
+    // 응답이 없으면 아직 진행 중
+    if (pair.assistantBubbles.length === 0) {
+      return false;
+    }
+    
+    // 마지막 페어가 아니면 이미 완료된 것으로 간주 (다음 user가 있음)
+    if (!isLastPair) {
+      return true;
+    }
+    
+    // 마지막 페어: 마지막 assistant bubble 이후 충분한 시간이 경과했는지 확인
+    const lastAssistant = pair.assistantBubbles[pair.assistantBubbles.length - 1];
+    const timeSinceLastResponse = Date.now() - lastAssistant.createdAt;
+    
+    const isComplete = timeSinceLastResponse >= this.COMPLETION_WAIT_MS;
+    
+    if (!isComplete && this.pollTickCount % 6 === 0) {
+      const waitingSec = Math.round((this.COMPLETION_WAIT_MS - timeSinceLastResponse) / 1000);
+      console.log(
+        `[BubblePairDetector] 마지막 페어 대기 중... (${waitingSec}초 후 완료)`
+      );
+    }
+    
+    return isComplete;
+  }
+  
+  /**
+   * 완료된 페어만 필터링
+   */
+  private filterCompletedPairs(
+    pairs: UserAssistantPair[],
+    allBubbles: Bubble[]
+  ): UserAssistantPair[] {
+    if (pairs.length === 0) {
+      return [];
+    }
+    
+    const completedPairs: UserAssistantPair[] = [];
+    
+    for (let i = 0; i < pairs.length; i++) {
+      const isLastPair = i === pairs.length - 1;
+      const isComplete = this.isPairComplete(pairs[i], isLastPair);
+      
+      if (isLastPair && !isComplete) {
+        const lastAssistant = pairs[i].assistantBubbles[pairs[i].assistantBubbles.length - 1];
+        const waitTime = Math.round((Date.now() - lastAssistant.createdAt) / 1000);
+        console.log(`[BubblePairDetector] 마지막 페어 대기 중: ${waitTime}초 경과 / ${this.COMPLETION_WAIT_MS / 1000}초 필요`);
+      }
+      
+      if (isComplete) {
+        completedPairs.push(pairs[i]);
+      }
+    }
+    
+    return completedPairs;
   }
   
   public resetCache(): void {

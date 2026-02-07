@@ -330,9 +330,20 @@ export class CursorDB {
 
     try {
       const result = this.db.exec(query);
+      
+      console.log(`[CursorDB] 쿼리 실행: ${query}`);
+      console.log(`[CursorDB] result.length: ${result.length}`);
+      if (result.length > 0) {
+        console.log(`[CursorDB] result[0].values.length: ${result[0].values.length}`);
+      }
 
       if (result.length === 0) {
         console.log(`[CursorDB] 해당 composer에 대한 bubble 없음: ${composerId}`);
+        return bubbles;
+      }
+      
+      if (result[0].values.length === 0) {
+        console.log(`[CursorDB] result는 있지만 values가 비어있음: ${composerId}`);
         return bubbles;
       }
 

@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
+import * as fs from 'fs';
 import parseDiff = require('parse-diff');
 
 const execFileAsync = promisify(execFile);
@@ -64,7 +65,24 @@ export async function getDiffLineRanges(
     throw err;
   }
 
-  if (!raw.trim()) {
+  let untrackedFiles: string[] = [];
+  if (!options?.commitHash) {
+    try {
+      const { stdout: untrackedOutput } = await execFileAsync(
+        'git',
+        ['ls-files', '--others', '--exclude-standard'],
+        { cwd: workspaceRoot, maxBuffer: 10 * 1024 * 1024 }
+      );
+      untrackedFiles = untrackedOutput.trim().split('\n').filter(Boolean);
+      if (untrackedFiles.length > 0) {
+        console.log('[gitDiff] untracked 파일 감지:', untrackedFiles.length, '개');
+      }
+    } catch (untrackedErr) {
+      console.warn('[gitDiff] untracked 파일 조회 실패:', untrackedErr);
+    }
+  }
+
+  if (!raw.trim() && untrackedFiles.length === 0) {
     console.log(
       '[gitDiff] raw diff 비어 있음. workspaceRoot=',
       workspaceRoot,
@@ -119,6 +137,33 @@ export async function getDiffLineRanges(
         '라인 범위 =',
         merged.map((r) => `${r.start}-${r.end}`).join(', ')
       );
+    }
+  }
+
+  // untracked 파일 처리: 전체 파일이 새로 추가된 것으로 간주
+  const filePaths = options?.filePaths ? new Set(options.filePaths.map((p) => path.normalize(p))) : null;
+  for (const untrackedFile of untrackedFiles) {
+    const normalized = path.normalize(untrackedFile).replace(/\\/g, '/');
+    
+    if (normalized === '.ai-context' || normalized.startsWith('.ai-context/')) continue;
+    
+    if (filePaths && !filePaths.has(normalized) && !Array.from(filePaths).some((fp) => fp.endsWith(normalized) || normalized.endsWith(fp))) continue;
+    
+    if (result[normalized]) continue;
+    
+    try {
+      const fullPath = path.join(workspaceRoot, untrackedFile);
+      const content = fs.readFileSync(fullPath, 'utf-8');
+      const lineCount = content.split('\n').length;
+      
+      result[normalized] = [{ start: 1, end: lineCount }];
+      console.log(
+        '[gitDiff] untracked 파일 전체 범위 추가:',
+        normalized,
+        '라인 범위 = 1-' + lineCount
+      );
+    } catch (readErr) {
+      console.warn('[gitDiff] untracked 파일 읽기 실패:', normalized, readErr);
     }
   }
 
