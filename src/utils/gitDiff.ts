@@ -81,10 +81,9 @@ export async function getDiffLineRanges(
 
   const runDiff = async (paths?: string[]): Promise<string> => {
     try {
-      const args = ['--no-color', '-U0'];
-      const diff = paths?.length
-        ? await git.diff(args.concat(['--', ...paths]))
-        : await git.diff(args);
+      const args = ['diff', '--no-color', '-U0'];
+      const fullArgs = paths?.length ? [...args, '--', ...paths] : args;
+      const diff = await git.raw(fullArgs);
       return typeof diff === 'string' ? diff : '';
     } catch {
       return '';
