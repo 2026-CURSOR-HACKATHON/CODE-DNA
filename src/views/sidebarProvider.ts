@@ -596,91 +596,36 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
       }
     }
     
-    /* Git Graph Nodes */
-    .git-graph-node {
-      position: absolute;
-      cursor: pointer;
-      transition: all 0.15s ease;
+    /* Git Graph Unified Style */
+    .git-graph-unified {
+      padding: 10px 8px;
     }
-    .git-graph-node:hover {
-      transform: scale(1.05);
-      z-index: 100;
+    .git-timeline-row {
+      transition: background 0.15s;
     }
-    .node-circle {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: var(--vscode-charts-blue);
-      border: 3px solid var(--vscode-editor-background);
-      box-shadow: 0 0 0 2px var(--vscode-charts-blue);
-      position: absolute;
-      left: -8px;
-      top: -8px;
-      transition: all 0.15s;
+    .git-timeline-row:hover {
+      background: var(--vscode-list-hoverBackground);
     }
-    .git-graph-node:hover .node-circle {
-      background: var(--vscode-charts-purple);
-      box-shadow: 0 0 0 3px var(--vscode-charts-purple), 0 0 10px rgba(156, 39, 176, 0.4);
-      transform: scale(1.2);
-      animation: pulse 2s ease-in-out infinite;
+    .git-timeline-row:hover .git-node-dot {
+      transform: scale(1.3);
+      box-shadow: 0 0 0 2px var(--vscode-sideBar-background), 0 0 6px currentColor !important;
     }
-    .node-card {
-      position: absolute;
-      left: 20px;
-      top: -16px;
-      background: var(--vscode-sideBar-background);
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 6px;
-      padding: 8px 12px;
-      min-width: 200px;
-      max-width: 280px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      transition: all 0.15s;
+    .git-timeline-row:hover .git-timeline-text {
+      opacity: 1;
+      font-weight: 500;
     }
-    .git-graph-node:hover .node-card {
-      border-color: var(--vscode-focusBorder);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    .git-timeline-hover {
+      animation: fadeIn 0.15s ease-out;
     }
-    .node-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 4px;
-    }
-    .node-card-id {
-      font-family: monospace;
-      font-size: 10px;
-      padding: 2px 6px;
-      background: var(--vscode-badge-background);
-      color: var(--vscode-badge-foreground);
-      border-radius: 3px;
-    }
-    .node-card-time {
-      font-size: 10px;
-      color: var(--vscode-descriptionForeground);
-    }
-    .node-card-prompt {
-      font-size: 11px;
-      margin: 4px 0;
-      color: var(--vscode-foreground);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      line-height: 1.4;
-    }
-    .node-card-meta {
-      font-size: 10px;
-      color: var(--vscode-descriptionForeground);
-    }
-    .lane-line {
-      position: absolute;
-      width: 2px;
-      background: linear-gradient(180deg, 
-        var(--vscode-charts-blue) 0%, 
-        var(--vscode-panel-border) 50%,
-        var(--vscode-charts-blue) 100%);
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-5px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
     .context-header {
       display: flex;
@@ -1108,7 +1053,6 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
 <body>
   <div class="tabs">
     <button class="tab active" data-tab="contexts">Contexts</button>
-    <button class="tab" data-tab="chat">AI Chat</button>
     <button class="tab" data-tab="settings">Settings</button>
   </div>
 
@@ -1259,19 +1203,29 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
         });
         
         return \`
-          <li class="context-item" data-id="\${ctx.id}" onclick="viewContext('\${ctx.id}')">
+          <li class="context-item" data-id="\${ctx.id}">
             <div class="context-header">
               <span class="context-id">\${ctx.id.substring(0, 8)}</span>
               <span class="context-time">\${date}</span>
             </div>
             <div class="context-prompt">\${ctx.prompt}</div>
             <div class="context-meta">\${ctx.files} files · \${ctx.tokens} tokens</div>
-            <div class="context-item-actions" onclick="event.stopPropagation()">
-              <button class="action-btn" onclick="attachContext('\${ctx.id}')">📎</button>
-            </div>
           </li>
         \`;
       }).join('');
+      
+      // Add click event listeners to context items
+      setTimeout(() => {
+        list.querySelectorAll('.context-item').forEach(item => {
+          item.addEventListener('click', function() {
+            const contextId = this.getAttribute('data-id');
+            if (contextId) {
+              console.log('Context item clicked:', contextId);
+              viewContext(contextId);
+            }
+          });
+        });
+      }, 0);
       
       // Render graph by composer
       renderGraphByComposer(contexts);
@@ -1280,162 +1234,188 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
     function renderGraphByComposer(contexts) {
       const container = document.getElementById('graph-container');
       
-      console.log('=== renderGraphByComposer START ===');
-      console.log('Total contexts received:', contexts?.length);
-      console.log('First 3 contexts:', contexts?.slice(0, 3));
-      
       if (!contexts || contexts.length === 0) {
         container.innerHTML = '<div class="empty-state">No contexts to display</div>';
-        console.log('No contexts, returning early');
         return;
       }
       
-      // Group by composerId
-      const composerGroups = {};
-      contexts.forEach((ctx, idx) => {
-        const composerId = ctx.composerId || 'unknown';
-        if (!composerGroups[composerId]) {
-          composerGroups[composerId] = [];
-        }
-        composerGroups[composerId].push(ctx);
-        if (idx < 5) {
-          console.log(\`Context \${idx}: id=\${ctx.id?.substring(0,8)}, composerId=\${composerId?.substring(0,8)}\`);
-        }
+      // Sort all contexts by timestamp (newest first)
+      const sortedContexts = [...contexts].sort((a, b) => b.timestamp - a.timestamp);
+      
+      // Assign colors and lanes to each composer
+      const composerIds = [...new Set(contexts.map(c => c.composerId || 'unknown'))];
+      const colors = [
+        '#4FC3F7',  // Blue
+        '#66BB6A',  // Green
+        '#AB47BC',  // Purple
+        '#FFA726',  // Orange
+        '#EF5350'   // Red
+      ];
+      
+      const composerInfo = {};
+      composerIds.forEach((id, idx) => {
+        composerInfo[id] = {
+          color: colors[idx % colors.length],
+          lane: idx,
+          label: \`Chat #\${idx + 1}\`
+        };
       });
       
-      console.log('Composer groups count:', Object.keys(composerGroups).length);
-      Object.keys(composerGroups).forEach(key => {
-        console.log(\`  - \${key?.substring(0,8)}: \${composerGroups[key].length} contexts\`);
-      });
-      
-      // Sort each group by timestamp (oldest first for proper timeline)
-      Object.keys(composerGroups).forEach(key => {
-        composerGroups[key].sort((a, b) => a.timestamp - b.timestamp);
-      });
-      
-      // Calculate layout
-      const composerIds = Object.keys(composerGroups);
-      const laneWidth = 350;
-      const nodeHeight = 80;
-      const laneOffset = 30;
-      
-      console.log('ComposerIds:', composerIds.map(id => id?.substring(0,8)));
-      
-      // Calculate total height
-      const maxNodes = Math.max(...composerIds.map(id => composerGroups[id].length));
-      const totalHeight = maxNodes * nodeHeight + 100;
-      const totalWidth = composerIds.length * laneWidth + 60;
-      
-      console.log('Layout:', {
-        lanes: composerIds.length,
-        maxNodes: maxNodes,
-        totalHeight: totalHeight,
-        totalWidth: totalWidth,
-        laneWidth: laneWidth
-      });
-      
-      // Create SVG-style container
+      // Create container
       container.innerHTML = '';
       const graphContainer = document.createElement('div');
-      graphContainer.className = 'graph-svg-container';
-      graphContainer.style.height = totalHeight + 'px';
-      graphContainer.style.minWidth = totalWidth + 'px';
+      graphContainer.className = 'git-graph-unified';
       graphContainer.style.position = 'relative';
+      graphContainer.style.minHeight = (sortedContexts.length * 32 + 30) + 'px';
+      graphContainer.style.paddingBottom = '10px';
       
-      console.log('Container before append:', {
-        width: container.offsetWidth,
-        height: container.offsetHeight,
-        scrollWidth: container.scrollWidth,
-        clientWidth: container.clientWidth,
-        style: container.style.cssText
-      });
+      const laneWidth = 20;
+      const textLeftMargin = 20 + (composerIds.length * laneWidth) + 10;
+      const rowHeight = 32;
       
-      // Render each lane
-      composerIds.forEach((composerId, laneIndex) => {
-        const laneX = laneIndex * laneWidth + laneOffset;
-        const contexts = composerGroups[composerId];
+      // Draw vertical lines for each lane (background)
+      composerIds.forEach((composerId, laneIdx) => {
+        const info = composerInfo[composerId];
+        const x = 20 + laneIdx * laneWidth;
         
-        console.log(\`Lane \${laneIndex}: \${contexts.length} contexts at x=\${laneX}, composerId=\${composerId}\`);
-        
-        // Lane label
-        const label = document.createElement('div');
-        label.className = 'lane-label';
-        label.textContent = \`Chat #\${laneIndex + 1} (\${contexts.length})\`;
-        label.style.position = 'absolute';
-        label.style.left = laneX + 'px';
-        label.style.top = '0px';
-        label.style.zIndex = '10';
-        graphContainer.appendChild(label);
-        
-        // Lane line
         const laneLine = document.createElement('div');
-        laneLine.className = 'lane-line';
-        laneLine.style.left = laneX + 'px';
-        laneLine.style.top = '30px';
-        laneLine.style.height = (contexts.length * nodeHeight) + 'px';
+        laneLine.style.position = 'absolute';
+        laneLine.style.left = (x + 6) + 'px';
+        laneLine.style.top = '0px';
+        laneLine.style.width = '2px';
+        laneLine.style.height = '100%';
+        laneLine.style.background = info.color;
+        laneLine.style.opacity = '0.15';
         graphContainer.appendChild(laneLine);
-        
-        // Render nodes
-        contexts.forEach((ctx, nodeIndex) => {
-          const nodeY = nodeIndex * nodeHeight + 50;
-          
-          const node = document.createElement('div');
-          node.className = 'git-graph-node';
-          node.style.left = laneX + 'px';
-          node.style.top = nodeY + 'px';
-          node.onclick = () => viewContext(ctx.id);
-          
-          const date = new Date(ctx.timestamp).toLocaleString('ko-KR', {
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-          });
-          
-          node.innerHTML = \`
-            <div class="node-circle"></div>
-            <div class="node-card">
-              <div class="node-card-header">
-                <span class="node-card-id">\${ctx.id.substring(0, 8)}</span>
-                <span class="node-card-time">\${date}</span>
-              </div>
-              <div class="node-card-prompt">\${ctx.prompt.substring(0, 50)}\${ctx.prompt.length > 50 ? '...' : ''}</div>
-              <div class="node-card-meta">\${ctx.files} files · \${ctx.tokens} tokens</div>
-            </div>
-          \`;
-          
-          console.log(\`  Node \${nodeIndex}: y=\${nodeY}\`);
-          graphContainer.appendChild(node);
-        });
       });
       
-      console.log('GraphContainer total children:', graphContainer.children.length);
-      
-      if (graphContainer.children.length === 0) {
-        console.error('WARNING: No children added to graphContainer!');
-        container.innerHTML = '<div class="empty-state" style="color: red;">렌더링 오류: 노드가 생성되지 않았습니다. Debug 버튼을 클릭하세요.</div>';
-        return;
-      }
+      // Render each context
+      sortedContexts.forEach((ctx, index) => {
+        const composerId = ctx.composerId || 'unknown';
+        const info = composerInfo[composerId];
+        const lane = info.lane;
+        const color = info.color;
+        const y = index * rowHeight + 20;
+        const x = 20 + lane * laneWidth;
+        
+        // Connection line to previous node in same composer
+        const prevSameComposer = sortedContexts.slice(0, index).find(c => c.composerId === composerId);
+        if (prevSameComposer) {
+          const prevIndex = sortedContexts.indexOf(prevSameComposer);
+          const prevY = prevIndex * rowHeight + 20;
+          
+          const vertLine = document.createElement('div');
+          vertLine.style.position = 'absolute';
+          vertLine.style.left = (x + 6) + 'px';
+          vertLine.style.top = (prevY + 12) + 'px';
+          vertLine.style.width = '2px';
+          vertLine.style.height = (y - prevY - 12) + 'px';
+          vertLine.style.background = color;
+          vertLine.style.opacity = '0.6';
+          graphContainer.appendChild(vertLine);
+        }
+        
+        // Create row wrapper
+        const row = document.createElement('div');
+        row.className = 'git-timeline-row';
+        row.style.position = 'absolute';
+        row.style.left = '0px';
+        row.style.top = y + 'px';
+        row.style.width = '100%';
+        row.style.height = rowHeight + 'px';
+        row.style.cursor = 'pointer';
+        row.onclick = () => viewContext(ctx.id);
+        
+        // Node circle
+        const circle = document.createElement('div');
+        circle.className = 'git-node-dot';
+        circle.style.position = 'absolute';
+        circle.style.left = x + 'px';
+        circle.style.top = '3px';
+        circle.style.width = '12px';
+        circle.style.height = '12px';
+        circle.style.borderRadius = '50%';
+        circle.style.background = color;
+        circle.style.border = \`2px solid var(--vscode-sideBar-background)\`;
+        circle.style.boxShadow = \`0 0 0 1px \${color}\`;
+        circle.style.transition = 'all 0.2s';
+        row.appendChild(circle);
+        
+        // Simple text info
+        const date = new Date(ctx.timestamp).toLocaleString('ko-KR', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        const textInfo = document.createElement('div');
+        textInfo.className = 'git-timeline-text';
+        textInfo.style.position = 'absolute';
+        textInfo.style.left = textLeftMargin + 'px';
+        textInfo.style.top = '0px';
+        textInfo.style.display = 'flex';
+        textInfo.style.alignItems = 'center';
+        textInfo.style.gap = '8px';
+        textInfo.style.fontSize = '11px';
+        textInfo.style.color = 'var(--vscode-foreground)';
+        textInfo.style.opacity = '0.8';
+        
+        textInfo.innerHTML = \`
+          <span style="font-family: monospace; font-size: 10px; color: var(--vscode-descriptionForeground);">\${ctx.id.substring(0, 8)}</span>
+          <span style="font-size: 10px; color: var(--vscode-descriptionForeground);">\${date}</span>
+        \`;
+        row.appendChild(textInfo);
+        
+        // Hover detail (hidden by default)
+        const hoverDetail = document.createElement('div');
+        hoverDetail.className = 'git-timeline-hover';
+        hoverDetail.style.position = 'fixed';
+        hoverDetail.style.display = 'none';
+        hoverDetail.style.background = 'var(--vscode-editorHoverWidget-background)';
+        hoverDetail.style.border = '1px solid var(--vscode-editorHoverWidget-border)';
+        hoverDetail.style.borderRadius = '4px';
+        hoverDetail.style.padding = '10px 12px';
+        hoverDetail.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+        hoverDetail.style.zIndex = '1000';
+        hoverDetail.style.maxWidth = '350px';
+        hoverDetail.style.pointerEvents = 'none';
+        
+        hoverDetail.innerHTML = \`
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: \${color};"></span>
+            <span style="font-size: 11px; color: var(--vscode-descriptionForeground);">\${info.label}</span>
+            <span style="font-family: monospace; font-size: 10px; padding: 2px 6px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); border-radius: 3px;">\${ctx.id.substring(0, 8)}</span>
+          </div>
+          <div style="font-size: 11px; color: var(--vscode-editorHoverWidget-foreground); margin-bottom: 6px; line-height: 1.4;">\${ctx.prompt.substring(0, 120)}\${ctx.prompt.length > 120 ? '...' : ''}</div>
+          <div style="font-size: 10px; color: var(--vscode-descriptionForeground); display: flex; gap: 12px;">
+            <span>📄 \${ctx.files} files</span>
+            <span>🔢 \${ctx.tokens} tokens</span>
+            <span>🕐 \${date}</span>
+          </div>
+        \`;
+        
+        row.addEventListener('mouseenter', function(e) {
+          hoverDetail.style.display = 'block';
+          const rect = row.getBoundingClientRect();
+          hoverDetail.style.left = (rect.right + 10) + 'px';
+          hoverDetail.style.top = Math.max(10, rect.top - 20) + 'px';
+        });
+        
+        row.addEventListener('mouseleave', function() {
+          hoverDetail.style.display = 'none';
+        });
+        
+        row.addEventListener('mousemove', function(e) {
+          const rect = row.getBoundingClientRect();
+          hoverDetail.style.top = Math.max(10, e.clientY - 30) + 'px';
+        });
+        
+        document.body.appendChild(hoverDetail);
+        graphContainer.appendChild(row);
+      });
       
       container.appendChild(graphContainer);
-      
-      // Force layout recalculation
-      setTimeout(() => {
-        console.log('Container after append:', {
-          width: container.offsetWidth,
-          height: container.offsetHeight,
-          scrollWidth: container.scrollWidth,
-          scrollHeight: container.scrollHeight
-        });
-        console.log('GraphContainer:', {
-          width: graphContainer.offsetWidth,
-          height: graphContainer.offsetHeight,
-          children: graphContainer.children.length
-        });
-      }, 100);
-      
-      console.log('Render complete. Container has', container.children.length, 'children');
-      console.log('=== renderGraphByComposer END ===');
     }
     
     window.attachContext = function(contextId) {
@@ -1448,7 +1428,24 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
     };
     
     function viewContext(contextId) {
-      vscode.postMessage({ type: 'viewContext', contextId });
+      console.log('viewContext called with id:', contextId);
+      
+      // Find the context in allContexts
+      const context = allContexts.find(c => c.id === contextId);
+      if (!context) {
+        console.error('Context not found:', contextId);
+        vscode.postMessage({ 
+          type: 'error', 
+          message: 'Context not found: ' + contextId 
+        });
+        return;
+      }
+      
+      // Request full context data from extension
+      vscode.postMessage({ 
+        type: 'viewContext', 
+        contextId: contextId 
+      });
     }
     window.viewContext = viewContext;
     
@@ -1784,7 +1781,10 @@ export class CodeDNASidebarProvider implements vscode.WebviewViewProvider {
         case 'switchToChatWithContext':
           attachedContexts = [message.context.id];
           updateAttachedContexts();
-          document.querySelector('[data-tab="chat"]').click();
+          const chatTabBtn = document.querySelector('.tab[data-tab="chat"]');
+          if (chatTabBtn) {
+            chatTabBtn.click();
+          }
           break;
         
         case 'showFullContext':
