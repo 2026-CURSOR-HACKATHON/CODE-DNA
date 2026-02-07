@@ -4,8 +4,9 @@ import { Bubble } from './cursor/types';
 import { MetadataStore } from './store/metadataStore';
 import { AIContextHoverProvider } from './providers/hoverProvider';
 import { AIResponseDetector } from './detectors/aiResponseDetector';
+import { BubblePairDetector } from './detectors/bubblePairDetector';
 import { FileChangeTracker } from './detectors/fileChangeTracker';
-import { runAiContextPipeline } from './detectors/aiContextPipeline';
+import { runAiContextPipeline, runAiContextPipelineForPair } from './detectors/aiContextPipeline';
 import { getFullContextWebviewContent, FullContextData } from './webview/fullContextView';
 import { AIContextDecorator } from './decorations/aiContextDecorator';
 import { SecretStorageManager } from './config/secretStorage';
@@ -13,6 +14,7 @@ import { callOpenAIChat, callAIForContextText } from './services/externalApi';
 import { CodeDNASidebarProvider } from './views/sidebarProvider';
 
 let aiResponseDetector: AIResponseDetector | null = null;
+let bubblePairDetector: BubblePairDetector | null = null;
 let fileChangeTracker: FileChangeTracker | null = null;
 let aiContextDecorator: AIContextDecorator | null = null;
 let sidebarProvider: CodeDNASidebarProvider | null = null;
@@ -114,9 +116,54 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
     console.log('[Phase 1] .ai-context 디렉터리 =', metadataStore.getDirPath(), 'metadata.json =', metadataStore.getMetadataPath());
     console.log('[Phase 1] Cursor DB 경로 =', cursorDB.getDbPath());
 
-    console.log('[Phase 1] 3단계: AI Response Detector 시작 (Cursor DB 감시)...');
+    console.log('[Phase 1] 3단계: Bubble Pair Detector 시작 (USER-ASSISTANT 페어링 기반)...');
     // 활성화 시점 workspaceRoot 캐시 (콜백에서 workspaceFolders 재조회 시 NoWorkspaceUriError 등으로 빈 값 나오는 것 방지)
     const cachedWorkspaceRoot = workspaceRoot;
+    
+    bubblePairDetector = new BubblePairDetector(workspaceRoot, cursorDB, {
+      onNewPair: async (pair) => {
+        const root = cachedWorkspaceRoot;
+        const tracker = fileChangeTracker;
+        
+        console.log(
+          '[AI Context Tracker] onNewPair 호출: USER=',
+          pair.userBubble.text.substring(0, 50),
+          '... ASSISTANT 응답=',
+          pair.assistantBubbles.length,
+          '개'
+        );
+        
+        if (!root || !tracker) {
+          console.log('[AI Context Tracker] workspaceRoot 또는 FileChangeTracker 없음 → 건너뜀');
+          return;
+        }
+        
+        try {
+          await runAiContextPipelineForPair(
+            root,
+            cursorDB,
+            metadataStore,
+            tracker,
+            pair,
+            {
+              onAiContextBranchFirstCreated: (branchName) => {
+                vscode.window.showInformationMessage(
+                  `AI Context Tracker: \`${branchName}\` 브랜치를 생성했습니다.`
+                );
+              }
+            }
+          );
+        } catch (e) {
+          console.error('[AI Context Tracker] 페어 처리 중 오류:', e);
+        }
+      }
+    });
+    
+    bubblePairDetector.startPolling();
+    console.log('[Phase 1] ✅ Bubble Pair Detector 시작 (5초 폴링)');
+    
+    // 기존 AIResponseDetector는 비활성화 (주석 처리)
+    /*
     aiResponseDetector = new AIResponseDetector(cursorDB, {
       onNewAIResponse: async (bubble: Bubble) => {
         const root = cachedWorkspaceRoot;
@@ -267,15 +314,16 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
         }, 30 * 1000);
       },
     });
-    aiResponseDetector.startPolling();
-    console.log('[Phase 1] ✅ AI Response Detector 시작 (5초 폴링 + File Watcher)');
+    */
+    // aiResponseDetector.startPolling();
+    // console.log('[Phase 1] ✅ AI Response Detector 시작 (5초 폴링 + File Watcher)');
 
     const stopDetectorCommand = vscode.commands.registerCommand(
       'ai-context-tracker.stopDetector',
       () => {
-        if (aiResponseDetector) {
-          aiResponseDetector.stopPolling();
-          vscode.window.showInformationMessage('AI Response Detector stopped');
+        if (bubblePairDetector) {
+          bubblePairDetector.stopPolling();
+          vscode.window.showInformationMessage('Bubble Pair Detector stopped');
         }
       }
     );
@@ -283,9 +331,9 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
     const startDetectorCommand = vscode.commands.registerCommand(
       'ai-context-tracker.startDetector',
       () => {
-        if (aiResponseDetector) {
-          aiResponseDetector.startPolling();
-          vscode.window.showInformationMessage('AI Response Detector started');
+        if (bubblePairDetector) {
+          bubblePairDetector.startPolling();
+          vscode.window.showInformationMessage('Bubble Pair Detector started');
         }
       }
     );
@@ -293,9 +341,9 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
     const resetDetectorCommand = vscode.commands.registerCommand(
       'ai-context-tracker.resetDetector',
       () => {
-        if (aiResponseDetector) {
-          aiResponseDetector.resetProcessedBubbleId();
-          vscode.window.showInformationMessage('Detector reset - will check all responses again');
+        if (bubblePairDetector) {
+          bubblePairDetector.resetCache();
+          vscode.window.showInformationMessage('Detector cache reset - will check all pairs again');
         }
       }
     );
@@ -320,12 +368,34 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
             vscode.ViewColumn.Beside,
             { enableScripts: true }
           );
+          // lineRanges 변환 (새 형식 → 기존 형식)
+          let files: { filePath: string; lineRanges: { start: number; end: number }[] }[] = [];
+          
+          if (meta.files && Array.isArray(meta.files)) {
+            files = meta.files;
+          } else if (meta.filesChanged && meta.lineRanges && typeof meta.lineRanges === 'object' && !Array.isArray(meta.lineRanges)) {
+            // 새로운 형식
+            files = meta.filesChanged.map(filePath => ({
+              filePath,
+              lineRanges: (meta.lineRanges as Record<string, [number, number][]>)[filePath]?.map(r => ({
+                start: r[0],
+                end: r[1]
+              })) || []
+            }));
+          } else if (meta.filePath && meta.lineRanges && Array.isArray(meta.lineRanges)) {
+            // 기존 단일 파일 형식
+            files = [{ 
+              filePath: meta.filePath, 
+              lineRanges: meta.lineRanges as { start: number; end: number }[]
+            }];
+          }
+          
           const data: FullContextData = {
             id,
             prompt: meta.prompt ?? '',
             thinking: meta.thinking ?? '',
             timestamp: meta.timestamp,
-            files: meta.files ?? (meta.filePath && meta.lineRanges ? [{ filePath: meta.filePath, lineRanges: meta.lineRanges }] : []),
+            files,
             timestampStr: meta.timestampStr ?? new Date(meta.timestamp).toLocaleString('ko-KR'),
           };
           panel.webview.html = getFullContextWebviewContent(data);
@@ -565,8 +635,8 @@ async function initializeForWorkspace(context: vscode.ExtensionContext): Promise
     console.log('[Phase 1] ========================================');
     console.log('[Phase 1] AI Context Tracker 활성화 완료');
     console.log('[Phase 1] - Hover Provider: 활성');
-    console.log('[Phase 1] - AI Response Detector: 활성 (5초 간격)');
-    console.log('[Phase 1] - File Change Tracker: 활성 (30초/±5초 윈도우)');
+    console.log('[Phase 1] - Bubble Pair Detector: 활성 (5초 간격, 페어링 기반)');
+    console.log('[Phase 1] - File Change Tracker: 활성 (범위 쿼리 지원)');
     console.log('[Phase 1] ========================================');
 
   } catch (error) {
@@ -597,6 +667,10 @@ export function deactivate() {
   if (fileChangeTracker) {
     fileChangeTracker.stop();
     fileChangeTracker = null;
+  }
+  if (bubblePairDetector) {
+    bubblePairDetector.stopPolling();
+    bubblePairDetector = null;
   }
   if (aiResponseDetector) {
     aiResponseDetector.stopPolling();

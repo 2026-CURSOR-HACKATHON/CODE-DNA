@@ -80,13 +80,38 @@ export class AIContextHoverProvider implements vscode.HoverProvider {
       // 메타 정보
       const fileEntry = entry.files?.find((f) => this.sameFileForEntry(f.filePath, filePath))
         ?? (entry.filePath && entry.lineRanges ? { filePath: entry.filePath, lineRanges: entry.lineRanges } : null);
-      const lineRangeStr = fileEntry
-        ? fileEntry.lineRanges
-          .map((r) => (r.start === r.end ? `${r.start}` : `${r.start}-${r.end}`))
-          .join(', ')
-        : `${lineNumber}`;
-      const tokenStr = entry.tokens != null ? String(entry.tokens) : '–';
       
+      let lineRangeStr = `${lineNumber}`;
+      if (fileEntry) {
+        const ranges = fileEntry.lineRanges;
+        if (Array.isArray(ranges)) {
+          lineRangeStr = ranges
+            .map((r: any) => {
+              if (typeof r === 'object' && 'start' in r && 'end' in r) {
+                return r.start === r.end ? `${r.start}` : `${r.start}-${r.end}`;
+              } else if (Array.isArray(r) && r.length === 2) {
+                return r[0] === r[1] ? `${r[0]}` : `${r[0]}-${r[1]}`;
+              }
+              return '';
+            })
+            .filter(Boolean)
+            .join(', ');
+        }
+      } else if (entry.lineRanges && typeof entry.lineRanges === 'object' && !Array.isArray(entry.lineRanges)) {
+        // 새로운 형식: Record<string, [number, number][]>
+        const ranges = entry.lineRanges[filePath];
+        if (ranges && Array.isArray(ranges)) {
+          lineRangeStr = ranges
+            .map((r: [number, number]) => r[0] === r[1] ? `${r[0]}` : `${r[0]}-${r[1]}`)
+            .join(', ');
+        }
+      }
+      
+      const tokenStr = entry.tokenCount 
+        ? `${entry.tokenCount.input}/${entry.tokenCount.output}`
+        : entry.tokens != null 
+        ? String(entry.tokens) 
+        : '–';
       markdown.appendMarkdown(`**Time:** ${timeStr} | **Files:** ${fileCount} | **Lines:** ${lineRangeStr} | **Tokens:** ${tokenStr}\n\n`);
 
       // 프롬프트
